@@ -84,6 +84,23 @@ workmate/
 └── build.gradle.kts
 ```
 
+## 工作区结构（AgentScope 标准）
+
+每个 agent 在 `.agentscope/workspace/{agentId}/` 下有一套标准工作区。其中**人设 / 记忆模板 / 领域知识**纳入版本管理（见 `.gitignore`），其余为运行态、由 AgentScope 自动生成：
+
+```
+.agentscope/workspace/{agentId}/
+├── AGENTS.md        # 人设：身份、职责、硬约束、约定（每次请求注入，保持精简）
+├── MEMORY.md        # 长期记忆起始模板（memory_save 维护，会随使用增长）
+├── memory/          # 记忆碎片 + 每日账本（运行态，memory_save 自动写入）
+├── knowledge/       # 领域知识（版本管理）
+│   └── KNOWLEDGE.md # 知识索引：导航到具体主题文档，按需定点读取
+├── skills/          # 技能（运行态 / 按需）
+├── rules/           # 规则（可选）
+├── sessions/        # 会话转录（运行态）
+└── tasks/           # 任务（运行态）
+```
+
 ## 配置说明
 
 ### `agentscope.*`
