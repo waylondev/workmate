@@ -1,3 +1,29 @@
 spring:
   application:
     name: workmate
+
+# AgentScope：仅使用官方 starter 的自动配置能力
+agentscope:
+  # 关闭官方默认 ReActAgent，改由 HarnessAgent 作为唯一 agent
+  agent:
+    enabled: false
+  model:
+    provider: openai
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model-name: ${OPENAI_MODEL:gpt-4.1-mini}
+    base-url: ${OPENAI_BASE_URL:}
+    stream: true
+  agui:
+    path-prefix: /agui
+    default-agent-id: default
+    enable-reasoning: true
+    emit-token-usage: true
+
+# 业务侧 harness agent 定义
+workmate:
+  agent:
+    id: default
+    name: Workmate
+    sys-prompt: You are Workmate, a helpful assistant.
+    workspace: .agentscope/workspace

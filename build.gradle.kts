@@ -8,6 +8,8 @@ plugins {
 group = "org.waylon"
 version = "0.0.1-SNAPSHOT"
 
+val agentscopeVersion = "2.0.4"
+
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(25)
@@ -19,8 +21,12 @@ repositories {
 }
 
 dependencies {
+	implementation("org.springframework.boot:spring-boot-starter-webflux")
 	implementation("org.springframework.boot:spring-boot-h2console")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
+	implementation("io.agentscope:agentscope-harness:$agentscopeVersion")
+	implementation("io.agentscope:agentscope-agui-spring-boot-starter:$agentscopeVersion")
+	implementation("io.agentscope:agentscope-openai-spring-boot-starter:$agentscopeVersion")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	compileOnly("org.projectlombok:lombok")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
