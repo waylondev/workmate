@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "check:ui": "vite build --ssr scripts/ui-check.tsx --outDir .ui-check --emptyOutDir --logLevel error && node .ui-check/ui-check.js",
     "lint": "oxlint",
     "preview": "vite preview"
   },

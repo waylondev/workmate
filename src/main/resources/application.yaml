@@ -17,10 +17,10 @@ agentscope:
   model:
     provider: openai
   openai:
-    # 本地 Ollama 走 OpenAI 兼容端点；Ollama 不校验 key，但多数 starter 要求非空，故给占位值
-    api-key: ${OPENAI_API_KEY:ollama}
-    model-name: ${OPENAI_MODEL:qwen2.5:1.5b}
-    base-url: ${OPENAI_BASE_URL:http://localhost:11434/v1}
+    # CPA(CLIProxyAPI) 反代 WorkBuddy 真实模型；key 用 CPA access.api-keys 里的值
+    api-key: ${OPENAI_API_KEY:sk-workmate-cpa-7d2b}
+    model-name: ${OPENAI_MODEL:hy3}
+    base-url: ${OPENAI_BASE_URL:http://127.0.0.1:8317/v1}
     stream: true
   agui:
     path-prefix: /agui

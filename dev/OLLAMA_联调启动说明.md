@@ -1,0 +1,136 @@
+# Workmate 本地联调启动说明
+
+> 目标：把 workmate 前后端跑通联调。
+> 当前主路线：**CPA(CLIProxyAPI) 反代 WorkBuddy 真实大模型**（免费 hy3 模型，含推理+工具调用执行链路）。
+> 备选路线：本地 Ollama 小模型（已弃用，仅保留作参考）。
+
+---
+
+## 一、服务全景（当前主路线：CPA）
+
+| 组件 | 地址 | 端口 | 说明 |
+|---|---|---|---|
+| **CPA** (CLIProxyAPI v8.0.23) | `http://127.0.0.1:8317/v1` | 8317 | OpenAI 兼容网关，反代 WorkBuddy 真实模型 |
+| **WorkBuddy 插件** | `D:\CPA\app\plugins\workbuddy.dll` (v0.9.56) | - | 对接腾讯国内版 copilot.tencent.com |
+| workmate 后端 | `http://127.0.0.1:8080` | 8080 | Spring Boot 4.1.1 / Java 25 |
+| workmate 前端 | `http://localhost:5173` | 5173 | Vite 8 / React，把 `/agui` 代理到 8080 |
+
+默认模型：`hy3`（WorkBuddy 免费模型，真实大模型，支持推理与工具调用）。
+
+---
+
+## 二、链路图
+
+```
+浏览器(5173) → workmate后端(8080) → CPA(8317 /v1) → WorkBuddy插件(腾讯账号) → 真实大模型(hy3)
+```
+
+- 后端到 CPA 走标准 OpenAI 兼容 `/v1/chat/completions`，故任何 OpenAI SDK 都能接。
+- 模型返回的**推理事件(REASONING_MESSAGE_*)** 与**工具调用事件(TOOL_CALL_*)** 会透传到前端，展示思考折叠卡片与工具调用卡片。
+
+---
+
+## 三、凭据（重要，勿泄露）
+
+| 用途 | 值 | 位置 |
+|---|---|---|
+| CPA 管理面板登录(secret-key) | `wb-cpa-2026-secret-8f3a` | 面板 `http://127.0.0.1:8317/management.html` |
+| CPA 客户端 API Key（workmate 用）| `sk-workmate-cpa-7d2b` | `D:\CPA\app\config.yaml` → `access.api-keys` |
+| 部署位置 | `D:\CPA\app\cli-proxy-api.exe` | - |
+| workmate 模型配置 | `hy3` | `application.yaml` → `agentscope.openai.model-name` |
+
+---
+
+## 四、CPA 启动与账号绑定
+
+### 启动 CPA
+```powershell
+# 前台（或注册为开机自启）
+& "D:\CPA\app\cli-proxy-api.exe"
+# 验证
+netstat -ano | findstr 8317     # 应出现 LISTENING
+curl http://127.0.0.1:8317/v1/models -H "Authorization: Bearer sk-workmate-cpa-7d2b"
+```
+
+### 绑定 WorkBuddy 账号（一次性）
+1. 打开 `http://127.0.0.1:8317/management.html`，用密钥 `wb-cpa-2026-secret-8f3a` 登录
+2. 左侧 **「OAuth 授权」→「+ 添加授权」→ 渠道选 WorkBuddy →「去授权」**
+3. 用你的腾讯 WorkBuddy 账号登录完成授权（新号需先在客户端发条消息激活）
+4. 授权后账号变 Active；`/v1/models` 即返回 30 个真实模型
+
+> 关键配置：`config.yaml` 里 `plugins.configs.workbuddy.login_region: cn`（cn=copilot.tencent.com 腾讯国内版）。若用海外版应改 `intl`。
+
+### 可用模型（30 个）
+`auto, default, hy3, hy3-x, hy4-preview, hy4-preview-x, glm-5.3, glm-5.3-flash, glm-5.2, glm-5.1, glm-5.0, glm-4.7, glm-4.6, glm-4.6v, glm-5v-turbo, deepseek-v4.1-flash, deepseek-v4-flash, deepseek-v4-pro, deepseek-v3-2-volc, kimi-k3-1, kimi-k2.8-preview, kimi-k2.7, kimi-k2.6, kimi-k2.5, kimi-k2-thinking, hunyuan-2.0-thinking, hunyuan-chat, minimax-m3, minimax-m2.5, space-bunny`
+
+默认用 **`hy3`（免费）**。
+
+---
+
+## 五、workmate 联调启动
+
+### 环境要求
+- **JDK 25**（系统默认可能是 JDK21，必须显式指定）`JAVA_HOME=D:\Users\Administrator\.jdks\openjdk-25.0.1`
+- Node / pnpm（前端 `pnpm dev`）
+
+### 后端启动（切到 CPA + hy3）
+```powershell
+$env:JAVA_HOME = "D:\Users\Administrator\.jdks\openjdk-25.0.1"
+cd D:\Users\Administrator\workspace\workmate
+.\gradlew.bat bootRun        # 监听 8080
+```
+`application.yaml` 已默认指向 CPA：
+```yaml
+agentscope:
+  openai:
+    api-key: ${OPENAI_API_KEY:sk-workmate-cpa-7d2b}
+    model-name: ${OPENAI_MODEL:hy3}
+    base-url: ${OPENAI_BASE_URL:http://127.0.0.1:8317/v1}
+```
+可用环境变量覆盖：`OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL`。
+
+### 前端启动
+```powershell
+cd D:\Users\Administrator\workspace\workmate\frontend
+pnpm dev        # 监听 5173
+```
+浏览器访问 **http://localhost:5173**。
+
+---
+
+## 六、冒烟验证（验证执行链路是否完整）
+
+```powershell
+# 1) 简单对话 → 应看到 REASONING(思考) + TEXT(回答)
+curl -N http://127.0.0.1:8080/agui/run/default -H "Content-Type: application/json" -H "Accept: text/event-stream" -d @D:\workmate\dev\agui.json
+
+# 2) 工具调用 → 应看到 REASONING + TOOL_CALL_START/ARGS/END(list_files) + TEXT
+curl -N http://127.0.0.1:8080/agui/run/default -H "Content-Type: application/json" -H "Accept: text/event-stream" -d @D:\workmate\dev\agui-tool.json
+```
+
+**预期事件流**（hy3 真实模型下）：
+```
+RUN_STARTED → REASONING_MESSAGE_START/CONTENT*/END → TOOL_CALL_START/ARGS/END → TEXT_MESSAGE_START/CONTENT*/END → RUN_FINISHED
+```
+前端会相应展示：思考折叠卡片、工具调用卡片（工具名+参数+结果）、最终回答。**这是判断执行链路是否展示的关键**。
+
+---
+
+## 七、已知问题与避坑
+
+1. **后端报 `unknown provider for model xxx`**：说明 `model-name` 不在 CPA 模型池，或账号未绑定（`/v1/models` 为空）。先查模型列表再改 `application.yaml`。
+2. **后端报 `AgentScheduler` ClassNotFound**：Gradle daemon 混用，执行 `gradlew.bat --stop` 后重启。
+3. **`ApiExceptionHandler.kt` 编译错误**：已修复（Spring 7 下 `exchange.request.path` 改为 `exchange.request.uri`），无需再改。
+4. **端口占用**：8317/8080/5173 被占用时先停占用进程。
+5. **后端重启方法**：先杀监听 8080 的 java 进程，再以 JDK25 环境变量跑 `gradlew.bat bootRun`（避免多实例抢端口）。
+
+---
+
+## 八、备选：本地 Ollama 路线（已弃用，仅参考）
+
+若不想依赖腾讯账号，可用本地 Ollama，但模型弱、慢、**不触发工具调用与推理**，前端执行链路展示不出来。
+- Ollama 0.40.3：`C:\Users\Administrator\AppData\Local\Programs\Ollama\ollama.exe`
+- 模型 `qwen2.5:1.5b`（约 986MB，纯 CPU；本机可用内存仅 ~1.2GB，此为本机上限）
+- 端点 `http://127.0.0.1:11434/v1`；切回只需把 `OPENAI_BASE_URL` 指向 11434、`OPENAI_MODEL=qwen2.5:1.5b`，并启动 Ollama serve。
+
+> 结论：联调与执行链路演示请走 **CPA + hy3**；Ollama 仅作离线兜底。

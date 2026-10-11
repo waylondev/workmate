@@ -1,56 +1,32 @@
 import { AgUiRuntimeProvider } from "@/ag-ui-runtime-provider"
-import { AGENTS } from "@/agents"
+import { AGENTS, agentById } from "@/agents"
 import { deleteSession as deleteSessionRemote } from "@/api"
 import { AdminPanel } from "@/AdminPanel"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { ChatChromeProvider, type ChatChrome, type PanelSection } from "@/chat-chrome"
+import { AppSidebar } from "@/components/app-sidebar"
+import { ConversationSummaryPanel } from "@/components/conversation-summary-panel"
 import { Thread } from "@/components/thread.aui"
+import { TooltipIconButton } from "@/components/tooltip-icon-button"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
+import { NAV_TITLES, type NavKey } from "@/nav"
 import {
-  PlusIcon,
-  SparklesIcon,
-  MessageSquareIcon,
-  Trash2Icon,
-  BotIcon,
-  WrenchIcon,
-  ClockIcon,
-} from "lucide-react"
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+  loadSessions,
+  newThreadId,
+  persistSessions,
+  titleFromMessage,
+  UNTITLED,
+  type ChatSession,
+} from "@/sessions"
+import { useAuiState } from "@assistant-ui/react"
+import { PanelLeftIcon, PanelRightIcon, SquarePenIcon } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
-type ChatSession = {
-  threadId: string
-  agentId: string
-  title: string
-  updatedAt: number
-}
-
-type NavKey = "chat" | "agents" | "skills" | "jobs"
-
-const SESSIONS_KEY = "workmate-sessions"
-
-function loadSessions(): ChatSession[] {
-  try {
-    const raw = localStorage.getItem(SESSIONS_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function persistSessions(sessions: ChatSession[]) {
-  try {
-    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
-  } catch {
-    // ignore quota / privacy-mode errors
-  }
-}
-
-function newThreadId() {
-  return crypto.randomUUID()
-}
-
+/**
+ * 三栏外壳：左侧导航 / 中栏对话 / 右侧「对话摘要」。
+ *
+ * <p>左侧栏与右侧面板都可折叠；右侧面板与中栏共享同一个 AG-UI 运行时，
+ * 因此「工作进度」直接来自真实 SSE 事件，而不是另建一套状态。
+ */
 export default function App() {
   const [agentId, setAgentId] = useState(AGENTS[0].id)
   const [nav, setNav] = useState<NavKey>("chat")
@@ -59,52 +35,48 @@ export default function App() {
     const existing = loadSessions()
     return existing.length > 0 ? existing[0].threadId : newThreadId()
   })
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [panelOpen, setPanelOpen] = useState(true)
 
-  // 当前会话列表持久化到 localStorage
   useEffect(() => {
     persistSessions(sessions)
   }, [sessions])
 
   const currentSession = useMemo(
-    () => sessions.find((s) => s.threadId === threadId),
+    () => sessions.find((session) => session.threadId === threadId),
     [sessions, threadId],
   )
-
   const activeAgentId = currentSession?.agentId ?? agentId
 
   const createSession = () => {
     const id = newThreadId()
-    const session: ChatSession = {
-      threadId: id,
-      agentId: agentId,
-      title: "新会话",
-      updatedAt: Date.now(),
-    }
-    setSessions((prev) => [session, ...prev])
+    setSessions((prev) => [
+      { threadId: id, agentId: activeAgentId, title: UNTITLED, updatedAt: Date.now() },
+      ...prev,
+    ])
     setThreadId(id)
     setNav("chat")
   }
 
   const switchSession = (id: string) => {
-    const session = sessions.find((s) => s.threadId === id)
-    if (session) {
-      setThreadId(id)
-      setAgentId(session.agentId)
-      setNav("chat")
-    }
+    const session = sessions.find((item) => item.threadId === id)
+    if (!session) return
+    setThreadId(id)
+    setAgentId(session.agentId)
+    setNav("chat")
   }
 
   const deleteSession = (id: string) => {
-    // 后端删除（复用官方 ThreadSessionManager，fire-and-forget）
     void deleteSessionRemote(id).catch(() => {
-      // 后端删除失败不阻塞本地清理
+      // 服务端会话池是诊断视图，删除失败不阻塞本地目录清理
     })
     setSessions((prev) => {
-      const next = prev.filter((s) => s.threadId !== id)
+      const next = prev.filter((session) => session.threadId !== id)
       if (id === threadId) {
-        if (next.length > 0) {
-          setThreadId(next[0].threadId)
-          setAgentId(next[0].agentId)
+        const fallback = next[0]
+        if (fallback) {
+          setThreadId(fallback.threadId)
+          setAgentId(fallback.agentId)
         } else {
           setThreadId(newThreadId())
         }
@@ -113,232 +85,216 @@ export default function App() {
     })
   }
 
-  const handleAgentChange = (id: string) => {
-    setAgentId(id)
+  const handleAgentChange = useCallback(
+    (id: string) => {
+      setAgentId(id)
+      setSessions((prev) =>
+        prev.map((session) =>
+          session.threadId === threadId ? { ...session, agentId: id } : session,
+        ),
+      )
+    },
+    [threadId],
+  )
+
+  /** 首条用户消息落定后，把默认标题换成消息摘要（仅在标题仍是默认值时）。 */
+  const applyTitle = useCallback((targetThreadId: string, text: string) => {
+    const title = titleFromMessage(text)
+    if (!title) return
     setSessions((prev) =>
-      prev.map((s) => (s.threadId === threadId ? { ...s, agentId: id } : s)),
+      prev.map((session) =>
+        session.threadId === targetThreadId && session.title === UNTITLED
+          ? { ...session, title, updatedAt: Date.now() }
+          : session,
+      ),
     )
-  }
+  }, [])
+
+  const revealPanel = useCallback((section?: PanelSection) => {
+    setPanelOpen(true)
+    if (!section) return
+    // 面板可能刚挂载，等一帧再滚动到目标段落
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document
+          .getElementById(`summary-${section}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" })
+      })
+    })
+  }, [])
+
+  const chrome = useMemo<ChatChrome>(
+    () => ({
+      agentId: activeAgentId,
+      onAgentChange: handleAgentChange,
+      revealPanel,
+      onNav: (key) => setNav(key),
+    }),
+    [activeAgentId, handleAgentChange, revealPanel],
+  )
 
   return (
     <TooltipProvider>
-      <div className="flex h-dvh bg-background">
-        {/* 最左窄图标导航栏 */}
-        <NavRail nav={nav} onNav={setNav} onNewChat={createSession} />
-
-        {/* 会话列表侧栏（仅聊天视图显示） */}
-        {nav === "chat" && (
-          <SessionSidebar
+      <div className="bg-background flex h-dvh">
+        {sidebarOpen && (
+          <AppSidebar
+            nav={nav}
+            onNav={setNav}
             sessions={sessions}
             currentThreadId={threadId}
-            onNew={createSession}
-            onSwitch={switchSession}
-            onDelete={deleteSession}
+            agentId={activeAgentId}
+            onNewChat={createSession}
+            onSwitchSession={switchSession}
+            onDeleteSession={deleteSession}
+            onAgentChange={handleAgentChange}
+            onCollapse={() => setSidebarOpen(false)}
           />
         )}
 
-        {/* 主内容区 */}
-        {nav === "chat" ? (
-          <AgUiRuntimeProvider key={threadId} agentId={activeAgentId} threadId={threadId}>
-            <div className="flex h-dvh min-w-0 flex-1 flex-col">
-              <Header agentId={activeAgentId} onAgentChange={handleAgentChange} />
+        <div className="flex min-w-0 flex-1">
+          {nav === "chat" ? (
+            <AgUiRuntimeProvider key={threadId} agentId={activeAgentId} threadId={threadId}>
+              <ChatChromeProvider value={chrome}>
+                <SessionTitler threadId={threadId} onTitle={applyTitle} />
+
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <ChatHeader
+                    title={currentSession?.title ?? UNTITLED}
+                    agentName={agentById(activeAgentId).name}
+                    sidebarOpen={sidebarOpen}
+                    panelOpen={panelOpen}
+                    onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                    onTogglePanel={() => setPanelOpen((open) => !open)}
+                    onNewChat={createSession}
+                  />
+                  <div className="min-h-0 flex-1">
+                    <Thread components={{ Welcome: () => <Welcome agentId={activeAgentId} /> }} />
+                  </div>
+                </div>
+
+                {panelOpen && (
+                  <ConversationSummaryPanel
+                    agentId={activeAgentId}
+                    onClose={() => setPanelOpen(false)}
+                  />
+                )}
+              </ChatChromeProvider>
+            </AgUiRuntimeProvider>
+          ) : (
+            <div className="flex min-w-0 flex-1 flex-col">
+              <AdminHeader
+                nav={nav}
+                sidebarOpen={sidebarOpen}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              />
               <div className="min-h-0 flex-1">
-                <Thread components={{ Welcome: () => <Welcome agentId={activeAgentId} /> }} />
+                <AdminPanel initialTab={nav} />
               </div>
             </div>
-          </AgUiRuntimeProvider>
-        ) : (
-          <div className="flex h-dvh min-w-0 flex-1 flex-col">
-            <Header agentId={activeAgentId} onAgentChange={handleAgentChange} />
-            <div className="min-h-0 flex-1">
-              <AdminPanel initialTab={nav} />
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </TooltipProvider>
   )
 }
 
-function NavRail({
-  nav,
-  onNav,
+function ChatHeader({
+  title,
+  agentName,
+  sidebarOpen,
+  panelOpen,
+  onToggleSidebar,
+  onTogglePanel,
   onNewChat,
 }: {
-  nav: NavKey
-  onNav: (key: NavKey) => void
+  title: string
+  agentName: string
+  sidebarOpen: boolean
+  panelOpen: boolean
+  onToggleSidebar: () => void
+  onTogglePanel: () => void
   onNewChat: () => void
 }) {
-  const items: { key: NavKey; label: string; icon: ReactNode }[] = [
-    { key: "chat", label: "会话", icon: <MessageSquareIcon className="size-5" /> },
-    { key: "agents", label: "Agent", icon: <BotIcon className="size-5" /> },
-    { key: "skills", label: "Skill", icon: <WrenchIcon className="size-5" /> },
-    { key: "jobs", label: "定时任务", icon: <ClockIcon className="size-5" /> },
-  ]
-
   return (
-    <nav className="border-border/60 bg-muted/30 flex w-14 shrink-0 flex-col items-center border-r py-3">
-      <div className="bg-foreground text-background mb-4 flex size-9 items-center justify-center rounded-lg">
-        <SparklesIcon className="size-5" />
+    <header className="border-border/60 bg-background/80 flex h-14 shrink-0 items-center gap-1 border-b px-3 backdrop-blur">
+      {!sidebarOpen && (
+        <TooltipIconButton tooltip="展开侧栏" onClick={onToggleSidebar} aria-label="展开侧栏">
+          <PanelLeftIcon />
+        </TooltipIconButton>
+      )}
+      <TooltipIconButton tooltip="新建对话" onClick={onNewChat} aria-label="新建对话">
+        <SquarePenIcon />
+      </TooltipIconButton>
+      <div className="pointer-events-none flex min-w-0 flex-1 justify-center px-2">
+        <span className="truncate text-sm font-medium">{title}</span>
       </div>
-
-      {items.map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          onClick={() => onNav(item.key)}
-          title={item.label}
-          aria-label={item.label}
-          className={cn(
-            "mb-1 flex size-10 items-center justify-center rounded-lg transition-colors",
-            nav === item.key
-              ? "bg-foreground text-background"
-              : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
-          )}
-        >
-          {item.icon}
-        </button>
-      ))}
-
-      <div className="mt-auto flex flex-col items-center gap-2">
-        <button
-          type="button"
-          onClick={onNewChat}
-          title="新建会话"
-          aria-label="新建会话"
-          className="text-muted-foreground hover:text-foreground flex size-10 items-center justify-center rounded-lg transition-colors"
-        >
-          <PlusIcon className="size-5" />
-        </button>
-        <ThemeToggle />
-      </div>
-    </nav>
+      <span className="text-muted-foreground hidden shrink-0 text-xs sm:block">{agentName}</span>
+      <TooltipIconButton
+        tooltip={panelOpen ? "收起对话摘要" : "展开对话摘要"}
+        onClick={onTogglePanel}
+        aria-label="切换对话摘要"
+        className={panelOpen ? "bg-accent text-foreground" : undefined}
+      >
+        <PanelRightIcon />
+      </TooltipIconButton>
+    </header>
   )
 }
 
-function SessionSidebar({
-  sessions,
-  currentThreadId,
-  onNew,
-  onSwitch,
-  onDelete,
+function AdminHeader({
+  nav,
+  sidebarOpen,
+  onToggleSidebar,
 }: {
-  sessions: ChatSession[]
-  currentThreadId: string
-  onNew: () => void
-  onSwitch: (id: string) => void
-  onDelete: (id: string) => void
+  nav: Exclude<NavKey, "chat">
+  sidebarOpen: boolean
+  onToggleSidebar: () => void
 }) {
   return (
-    <aside className="border-border/60 bg-muted/20 flex w-64 shrink-0 flex-col border-r">
-      <div className="flex items-center justify-between border-b border-border/60 px-3 py-3">
-        <span className="text-sm font-medium">会话</span>
-        <button
-          type="button"
-          onClick={onNew}
-          className="bg-foreground text-background flex size-7 items-center justify-center rounded-lg transition-colors hover:opacity-80"
-          aria-label="新建会话"
-          title="新建会话"
-        >
-          <PlusIcon className="size-4" />
-        </button>
-      </div>
-      <div className="flex-1 overflow-y-auto p-2">
-        {sessions.length === 0 ? (
-          <p className="text-muted-foreground px-2 py-4 text-xs">暂无会话，点击上方 + 新建</p>
-        ) : (
-          <ul className="flex flex-col gap-0.5">
-            {sessions.map((session) => (
-              <li key={session.threadId}>
-                <div
-                  className={cn(
-                    "group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors",
-                    session.threadId === currentThreadId
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onSwitch(session.threadId)}
-                    className="flex min-w-0 flex-1 items-center gap-2 text-start"
-                  >
-                    <MessageSquareIcon className="size-3.5 shrink-0" />
-                    <span className="truncate">{session.title}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(session.threadId)}
-                    className="text-muted-foreground hover:text-destructive opacity-0 transition-opacity group-hover:opacity-100"
-                    aria-label="删除会话"
-                    title="删除会话"
-                  >
-                    <Trash2Icon className="size-3.5" />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </aside>
-  )
-}
-
-function Header({
-  agentId,
-  onAgentChange,
-}: {
-  agentId: string
-  onAgentChange: (id: string) => void
-}) {
-  return (
-    <header className="border-border/60 bg-background/80 shrink-0 border-b backdrop-blur">
-      <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-3 px-4">
-        <AgentSwitcher agentId={agentId} onAgentChange={onAgentChange} />
+    <header className="border-border/60 bg-background/80 flex h-14 shrink-0 items-center gap-1 border-b px-3 backdrop-blur">
+      {!sidebarOpen && (
+        <TooltipIconButton tooltip="展开侧栏" onClick={onToggleSidebar} aria-label="展开侧栏">
+          <PanelLeftIcon />
+        </TooltipIconButton>
+      )}
+      <div className="min-w-0 flex-1 px-1">
+        <span className="truncate text-sm font-medium">{NAV_TITLES[nav]}</span>
       </div>
     </header>
   )
 }
 
-function AgentSwitcher({
-  agentId,
-  onAgentChange,
+/**
+ * 会话标题自动生成：监听线程里第一条用户消息。
+ *
+ * <p>渲染为空，只做一次本地目录的标题提升；不触碰后端转录。
+ */
+function SessionTitler({
+  threadId,
+  onTitle,
 }: {
-  agentId: string
-  onAgentChange: (id: string) => void
+  threadId: string
+  onTitle: (threadId: string, text: string) => void
 }) {
-  return (
-    <div
-      role="tablist"
-      aria-label="选择 Agent"
-      className="bg-muted flex shrink-0 items-center gap-0.5 rounded-lg p-0.5"
-    >
-      {AGENTS.map((agent) => (
-        <button
-          key={agent.id}
-          type="button"
-          role="tab"
-          aria-selected={agent.id === agentId}
-          title={agent.description}
-          onClick={() => onAgentChange(agent.id)}
-          className={cn(
-            "rounded-md px-2.5 py-1 text-xs font-medium transition-colors outline-none",
-            "focus-visible:ring-ring/50 focus-visible:ring-1",
-            agent.id === agentId
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {agent.name}
-        </button>
-      ))}
-    </div>
-  )
+  const firstUserText = useAuiState((state) => {
+    const message = state.thread.messages.find((item) => item.role === "user")
+    if (!message) return null
+    const text = message.parts
+      .flatMap((part) => (part.type === "text" ? [part.text] : []))
+      .join("")
+      .trim()
+    return text.length > 0 ? text : null
+  })
+
+  useEffect(() => {
+    if (firstUserText) onTitle(threadId, firstUserText)
+  }, [firstUserText, threadId, onTitle])
+
+  return null
 }
 
 function Welcome({ agentId }: { agentId: string }) {
-  const agent = AGENTS.find((a) => a.id === agentId) ?? AGENTS[0]
+  const agent = agentById(agentId)
   return (
     <div className="aui-thread-welcome-root fade-in slide-in-from-bottom-1 animate-in fill-mode-both mb-8 flex flex-col items-center px-4 text-center duration-200">
       <h1 className="text-foreground text-3xl font-semibold tracking-tight text-balance">

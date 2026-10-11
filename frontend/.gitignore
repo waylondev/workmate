@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# 无浏览器环境下的 UI 校验产物（由 pnpm check:ui 生成）
+.ui-check
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
