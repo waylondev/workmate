@@ -149,6 +149,7 @@ function ToolFallbackTrigger({
 }) {
   const statusType = status?.type ?? "complete";
   const isRunning = statusType === "running";
+  const isRequiresAction = statusType === "requires-action";
   const isCancelled =
     status?.type === "incomplete" && status.reason === "cancelled";
 
@@ -166,7 +167,10 @@ function ToolFallbackTrigger({
     <CollapsibleTrigger
       data-slot="tool-fallback-trigger"
       className={cn(
-        "aui-tool-fallback-trigger group/trigger text-muted-foreground hover:text-foreground flex w-fit max-w-full origin-left items-center gap-2 py-1.5 text-sm transition-[color,scale] active:scale-[0.98]",
+        "aui-tool-fallback-trigger group/trigger text-muted-foreground hover:text-foreground flex w-fit max-w-full origin-left items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-[color,scale] active:scale-[0.98]",
+        isRequiresAction &&
+          "border-amber-400/50 bg-amber-400/10 text-amber-200 hover:text-amber-100",
+        !isRequiresAction && "border-transparent hover:border-border/60",
         className,
       )}
       {...props}
@@ -177,6 +181,7 @@ function ToolFallbackTrigger({
           "aui-tool-fallback-trigger-icon size-4 shrink-0",
           isCancelled && "text-muted-foreground",
           isRunning && "animate-spin [animation-duration:0.6s]",
+          isRequiresAction && "text-amber-400 animate-pulse",
         )}
       />
       <span
@@ -189,6 +194,14 @@ function ToolFallbackTrigger({
       >
         {label}: <b>{toolName}</b>
       </span>
+      {isRequiresAction && (
+        <span
+          data-slot="tool-fallback-trigger-badge"
+          className="bg-amber-400 text-black inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide"
+        >
+          待授权
+        </span>
+      )}
       <ToolFallbackDuration />
       <ChevronDownIcon
         data-slot="tool-fallback-trigger-chevron"
@@ -1168,10 +1181,14 @@ function ToolFallbackApprovalImpl({
       <div className="flex items-center gap-2">
         <Button
           size="sm"
-          className={pressable}
+          className={cn(
+            pressable,
+            "bg-emerald-500 hover:bg-emerald-400 text-white",
+          )}
           onClick={() => respond(true)}
           disabled={locked}
         >
+          <CheckIcon className="size-3.5" aria-hidden />
           Allow
         </Button>
         <Button

@@ -3,6 +3,7 @@ import { classifyAguiFailure, type AguiFailure } from "@/agui-errors"
 import { AGENTS, agentById } from "@/agents"
 import { AdminPanel } from "@/AdminPanel"
 import { ChatChromeProvider, type ChatChrome, type PanelSection } from "@/chat-chrome"
+import { ApprovalBanner } from "@/components/approval-banner"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ConversationSummaryPanel } from "@/components/conversation-summary-panel"
 import { Thread } from "@/components/thread.aui"
@@ -18,7 +19,7 @@ import {
   type ChatSession,
 } from "@/sessions"
 import { useAuiState } from "@assistant-ui/react"
-import { AlertTriangleIcon, PanelLeftIcon, PanelRightIcon, SquarePenIcon, XIcon } from "lucide-react"
+import { AlertTriangleIcon, PanelLeftIcon, PanelRightIcon, SparklesIcon, SquarePenIcon, XIcon } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 /**
@@ -39,6 +40,8 @@ export default function App() {
   const [panelOpen, setPanelOpen] = useState(true)
   /** 会话在服务端卡在待授权时的出路提示；正常失败仍由消息内的错误区展示。 */
   const [failure, setFailure] = useState<AguiFailure | null>(null)
+  /** 本会话内「自动批准」开关：开启后新出现的工具授权自动放行。 */
+  const [allowAll, setAllowAll] = useState(false)
 
   useEffect(() => {
     persistSessions(sessions)
@@ -189,6 +192,10 @@ export default function App() {
                       onDismiss={() => setFailure(null)}
                     />
                   )}
+                  <ApprovalBanner
+                    persistApprovals={allowAll}
+                    onAllowAllChange={setAllowAll}
+                  />
                   <div className="min-h-0 flex-1">
                     <Thread components={{ Welcome: () => <Welcome agentId={activeAgentId} /> }} />
                   </div>
@@ -238,7 +245,7 @@ function ChatHeader({
   onNewChat: () => void
 }) {
   return (
-    <header className="border-border/60 bg-background/80 flex h-14 shrink-0 items-center gap-1 border-b px-3 backdrop-blur">
+    <header className="glass border-border/60 relative z-10 flex h-14 shrink-0 items-center gap-1 border-b px-3">
       {!sidebarOpen && (
         <TooltipIconButton tooltip="展开侧栏" onClick={onToggleSidebar} aria-label="展开侧栏">
           <PanelLeftIcon />
@@ -381,7 +388,10 @@ function Welcome({ agentId }: { agentId: string }) {
   const agent = agentById(agentId)
   return (
     <div className="aui-thread-welcome-root fade-in slide-in-from-bottom-1 animate-in fill-mode-both mb-8 flex flex-col items-center px-4 text-center duration-200">
-      <h1 className="text-foreground text-3xl font-semibold tracking-tight text-balance">
+      <div className="text-primary-foreground btn-brand mb-4 flex size-12 items-center justify-center rounded-2xl shadow-[0_0_30px_-6px_var(--color-brand-violet)]">
+        <SparklesIcon className="size-6" />
+      </div>
+      <h1 className="text-gradient text-3xl font-semibold tracking-tight text-balance">
         {agent.name}
       </h1>
       <p className="text-muted-foreground mt-2.5 max-w-md text-[15px] leading-relaxed text-pretty">

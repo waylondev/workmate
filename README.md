@@ -76,6 +76,7 @@ AgentScope 相关依赖（`io.agentscope:2.0.4`）：
 
 - **右栏「对话摘要」不维护独立状态**：`src/work-progress.ts` 是从 assistant-ui 的 `AssistantState["thread"]["messages"]` 派生数据的纯函数（工具调用 → 工作步骤，含进行中 / 完成 / 失败三态，以及对话产物、最近文件）。因此右栏必须渲染在 `AgUiRuntimeProvider` 之内。
 - **锚点联动**：输入区的 `ComposerChips`（agent / 权限 / 技能 / 工作进度 chip）经 `ChatChrome.revealPanel(section)` 展开右栏并滚动到 `#summary-{section}`。
+- **工具授权**：工具需授权时，中栏顶部弹出 `ApprovalBanner`（醒目横幅，列出待确认工具），可直接「允许 / 全部允许 / 拒绝」，并可勾选「本会话内自动批准」。待授权项由 `src/approvals.ts` 的纯函数从消息树派生，批准经 `ag-ui-runtime-provider.tsx` 暴露的 `respondToToolApproval` 回传后端。工具卡在 `requires-action` 态收起时即高亮（琥珀色边框 + 「待授权」徽章）。
 - **会话目录在前端**：`src/sessions.ts` 用 localStorage 维护 `threadId → { agentId, title, updatedAt }`，首条用户消息自动生成标题。真正的对话转录由后端 SessionTree 落盘，侧栏的「移除」只影响本地目录。
 - `src/agents.ts` 是前端的 agent 目录（与后端 `workmate.agents` 一一对应），左栏「工作区」段与输入区 chip 都可切换 `default / coder / explorer`；切换时以 `key` 重挂载运行时，每个 agent 是一段独立会话。
 
@@ -103,8 +104,11 @@ workmate/
 ├── src/main/resources/application.yaml # 全部运行时配置
 ├── frontend/                           # 前端工程（独立根目录）
 │   ├── src/App.tsx                     # 三栏外壳（侧栏 / 中栏 / 右栏对话摘要）
-│   ├── src/ag-ui-runtime-provider.tsx  # AG-UI 运行时接入（threadId 由外部传入）
+│   ├── src/ag-ui-runtime-provider.tsx  # AG-UI 运行时接入 + 审批能力上下文
+│   ├── src/agui-sse.ts                 # SSE 包装：剔除 expiresAt:null 再交运行时解析
+│   ├── src/agui-errors.ts              # 运行失败归类（会话卡在待授权 → 出路）
 │   ├── src/agents.ts                   # 前端 agent 目录（含 permission 展示）
+│   ├── src/approvals.ts                # 待授权项派生（纯函数，横幅数据源）
 │   ├── src/api.ts                      # /api/* 封装（RFC 7807 → ApiError）
 │   ├── src/sessions.ts                 # 本地会话目录（localStorage）
 │   ├── src/work-progress.ts            # 右栏派生逻辑（纯函数，无独立状态）
@@ -114,11 +118,14 @@ workmate/
 │   ├── src/components/                 # assistant-ui CLI 生成组件 + 外壳组件
 │   │   ├── app-sidebar.tsx             # 左栏
 │   │   ├── conversation-summary-panel.tsx # 右栏
+│   │   ├── approval-banner.tsx         # 工具授权横幅（允许 / 全部允许 / 拒绝）
 │   │   └── composer-chips.tsx          # 输入区工具条（锚点联动）
 │   ├── scripts/ui-check.tsx            # SSR 三栏结构校验（pnpm check:ui）
+│   ├── scripts/agui-pipeline-check.ts  # HITL 审批管线校验（pnpm check:agui）
 │   └── vite.config.ts                  # Tailwind 插件 + @ 别名 + /agui + /api 代理
-├── dev/verify-all.sh                   # 前后端联调全量验证脚本
+├── dev/OLLAMA_联调启动说明.md        # 本机模型（CPA）联调启动步骤
 ├── docs/verification-report.md         # 联调验证报告
+├── docs/frontend-enhancement-report.md # 前端功能增强验证报告
 └── build.gradle.kts
 ```
 

@@ -126,5 +126,57 @@ try {
   check("工作进度派生", false, String(cause))
 }
 
+// ---- 3) 待授权派生（全部允许 / 醒目横幅的数据源）----
+try {
+  const { derivePendingApprovals } = await import("@/approvals")
+  type Messages = Parameters<typeof derivePendingApprovals>[0]
+
+  const withApproval = [
+    {
+      id: "a1",
+      role: "assistant",
+      parts: [
+        {
+          type: "tool-call",
+          toolCallId: "t1",
+          toolName: "list_files",
+          args: {},
+          argsText: "",
+          status: { type: "requires-action", reason: "interrupt" },
+          approval: { id: "approval-1", prompt: "list_files 需要授权" },
+        },
+        {
+          type: "tool-call",
+          toolCallId: "t2",
+          toolName: "glob_files",
+          args: {},
+          argsText: "",
+          status: { type: "requires-action", reason: "interrupt" },
+          approval: { id: "approval-2", approved: true },
+        },
+        {
+          type: "tool-call",
+          toolCallId: "t3",
+          toolName: "read_file",
+          args: {},
+          argsText: "",
+          status: { type: "complete" },
+        },
+      ],
+    },
+  ] as unknown as Messages
+
+  const pending = derivePendingApprovals(withApproval)
+  check("待授权项只统计 approved 未定的", pending.length === 1, `实际 ${pending.length}`)
+  check("解析出工具名", pending[0]?.toolName === "list_files", String(pending[0]?.toolName))
+  check("解析出 approvalId", pending[0]?.approvalId === "approval-1", String(pending[0]?.approvalId))
+  check("已批准/已完成的不计入", !pending.some((p) => p.toolName === "glob_files" || p.toolName === "read_file"), "")
+
+  const none = derivePendingApprovals([] as unknown as Messages)
+  check("空线程无待授权", none.length === 0, String(none.length))
+} catch (cause) {
+  check("待授权派生", false, String(cause))
+}
+
 console.log(failures === 0 ? "全部通过" : `${failures} 项失败`)
 if (failures > 0) process.exitCode = 1

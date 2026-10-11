@@ -33,7 +33,8 @@ const resolveFixture = (): string => {
   if (explicit) return explicit
   const dir = join(repoRoot, "build", "int", "verify")
   const candidates = readdirSync(dir)
-    .filter((name) => name.startsWith("hitl-") && name.endsWith(".txt"))
+    // 只取真正的 SSE 事件流文件：以 `data:{` 开头的 hitl-*.txt（排除 hitl-e2e.txt 这类摘要）
+    .filter((name) => name.startsWith("hitl-") && name.endsWith(".txt") && name !== "hitl-e2e.txt")
     .map((name) => join(dir, name))
     .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
   if (candidates.length === 0) {
@@ -231,6 +232,26 @@ if (pending && pending.interrupts.length > 0) {
     "Z10 点击批准被运行时接受（批次未齐时不报错，等其余闸门）",
     respondError === undefined || !/no pending tool-call interrupt/.test(respondError.message),
     respondError ? respondError.message.split("\n")[0] : "",
+  )
+
+  // 「全部允许」= 对所有待决 approval 逐个 respond(true)。
+  // 这里用真实 runtime 验证：收集全部 approval id 后循环批准，无一报「已决定」以外的错。
+  const allApprovalIds = approved
+    .map((part) => (part.approval as { id?: string } | undefined)?.id)
+    .filter((id): id is string => typeof id === "string")
+  let allAllowError: Error | undefined
+  try {
+    for (const id of allApprovalIds) {
+      await core.respondToToolApproval({ approvalId: id, approved: true })
+    }
+  } catch (raised) {
+    allAllowError = raised as Error
+  }
+  check(
+    "Z16 「全部允许」可批量批准所有待授权项（逐个 respond 无致命错误）",
+    allApprovalIds.length > 0 &&
+      (allAllowError === undefined || /already decided/.test(allAllowError.message)),
+    `${allApprovalIds.length} 个 approval；${allAllowError ? allAllowError.message.split("\n")[0] : "全部接受"}`,
   )
 }
 

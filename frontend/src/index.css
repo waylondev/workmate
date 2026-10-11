@@ -8,56 +8,68 @@
 
 @custom-variant data-closed (&:where([data-state="closed"], [data-closed]:not([data-closed="false"])));
 
-/* shadcn base-nova 语义色板（neutral 基色）。这些原始 token 直接供组件用 var(--xxx) 引用，
- * 再由下方 @theme 映射成 Tailwind 颜色工具类（bg-background / text-muted-foreground 等）。 */
+/*
+ * 科技感设计令牌。
+ *
+ * 品牌主色走 cyan → violet 渐变，替代中性灰；面板用分层玻璃面（半透明 +
+ * backdrop-blur）；背景叠加径向光斑与细网格，营造「环境光 + 空间网格」的
+ * 深度感。shadcn 组件仍引用 var(--background / --primary / --muted ...) 等
+ * 语义 token，因此只改这里即可全局换肤。
+ */
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.959 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.959 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.959 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* 品牌色 */
+  --brand-cyan: oklch(0.75 0.16 195);
+  --brand-violet: oklch(0.62 0.21 290);
+  --brand-glow: oklch(0.72 0.18 240);
+
+  /* 亮色（浅色主题） */
+  --background: oklch(0.985 0.004 250);
+  --foreground: oklch(0.18 0.02 260);
+  --card: oklch(0.995 0.002 250 / 82%);
+  --card-foreground: oklch(0.18 0.02 260);
+  --popover: oklch(0.99 0.003 250 / 92%);
+  --popover-foreground: oklch(0.18 0.02 260);
+  --primary: oklch(0.58 0.16 250);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.94 0.015 250);
+  --secondary-foreground: oklch(0.25 0.03 260);
+  --muted: oklch(0.94 0.012 250);
+  --muted-foreground: oklch(0.5 0.02 260);
+  --accent: oklch(0.91 0.03 250);
+  --accent-foreground: oklch(0.25 0.03 260);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.705 0 0);
+  --border: oklch(0.12 0.03 260 / 8%);
+  --input: oklch(0.12 0.03 260 / 12%);
+  --ring: oklch(0.62 0.14 245);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  /* 深色主题：近黑蓝底，品牌光晕点缀 */
+  --background: oklch(0.16 0.018 260);
+  --foreground: oklch(0.94 0.01 250);
+  --card: oklch(0.21 0.02 260 / 72%);
+  --card-foreground: oklch(0.94 0.01 250);
+  --popover: oklch(0.22 0.02 260 / 92%);
+  --popover-foreground: oklch(0.94 0.01 250);
+  --primary: oklch(0.72 0.15 235);
+  --primary-foreground: oklch(0.14 0.02 260);
+  --secondary: oklch(0.26 0.02 260);
+  --secondary-foreground: oklch(0.94 0.01 250);
+  --muted: oklch(0.26 0.02 260);
+  --muted-foreground: oklch(0.68 0.015 250);
+  --accent: oklch(0.28 0.03 260);
+  --accent-foreground: oklch(0.94 0.01 250);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.68 0.13 245);
 }
 
-/* 非 inline 的 @theme：既生成 Tailwind 工具类，也把 --color-* / --radius-* 输出为真实 CSS 变量，
- * 这样组件里直接写 var(--color-muted) / var(--color-background) / var(--radius-md) 也能解析。 */
+/* 非 inline 的 @theme：既生成 Tailwind 工具类，也把 --color-* / --radius-* 输出为真实 CSS 变量 */
 @theme {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -83,6 +95,9 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --color-brand-cyan: var(--brand-cyan);
+  --color-brand-violet: var(--brand-violet);
 }
 
 @layer base {
@@ -105,6 +120,75 @@
     color: var(--color-foreground);
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
       "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    /* 环境光晕 + 细网格底纹 */
+    background-image:
+      radial-gradient(
+        60rem 40rem at 12% -8%,
+        color-mix(in oklab, var(--brand-cyan) 12%, transparent),
+        transparent 60%
+      ),
+      radial-gradient(
+        50rem 36rem at 100% 0%,
+        color-mix(in oklab, var(--brand-violet) 12%, transparent),
+        transparent 60%
+      ),
+      radial-gradient(
+        40rem 30rem at 50% 120%,
+        color-mix(in oklab, var(--brand-glow) 8%, transparent),
+        transparent 60%
+      );
+    background-attachment: fixed;
+  }
+
+  /* 细网格底纹：仅深色主题下明显，浅色主题用极淡的透明度 */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+      linear-gradient(to right, var(--color-border) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: radial-gradient(
+      ellipse 80% 60% at 50% 0%,
+      black 0%,
+      transparent 70%
+    );
+    opacity: 0.35;
+  }
+
+  /* 品牌渐变文字工具类 */
+  .text-gradient {
+    background: linear-gradient(
+      100deg,
+      var(--brand-cyan),
+      var(--brand-violet)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* 玻璃面板工具类 */
+  .glass {
+    background-color: var(--color-card);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+  }
+
+  /* 品牌主按钮渐变 */
+  .btn-brand {
+    background: linear-gradient(
+      100deg,
+      var(--brand-cyan),
+      var(--brand-violet)
+    );
+    color: var(--color-primary-foreground);
+  }
+  .btn-brand:hover {
+    filter: brightness(1.08);
   }
 }
 

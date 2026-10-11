@@ -1,8 +1,27 @@
 import { HttpAgent } from "@ag-ui/client"
-import { AssistantRuntimeProvider } from "@assistant-ui/react"
+import { AssistantRuntimeProvider, type RespondToToolApprovalOptions } from "@assistant-ui/react"
 import { useAgUiRuntime } from "@assistant-ui/react-ag-ui"
-import { useMemo, type ReactNode } from "react"
+import { createContext, useContext, useMemo, type ReactNode } from "react"
 import { aguiSseFetch } from "@/agui-sse"
+
+/**
+ * 运行时能力上下文：把 `useAgUiRuntime` 拿到的 thread 审批方法暴露给
+ * `AssistantRuntimeProvider` 之外的组件（顶部审批横幅等）。
+ *
+ * <p>store 层的 `useAui().thread` 类型（`ThreadMethods`）没有声明 AG-UI 适配器
+ * 动态注册的 `respondToToolApproval`，但运行时确实有它；这里显式提取并
+ * 透传，既拿到正确类型，也不依赖 store schema 的补丁。
+ */
+type ApprovalRuntime = {
+  respondToToolApproval: (options: RespondToToolApprovalOptions) => Promise<void>
+}
+
+const ApprovalRuntimeContext = createContext<ApprovalRuntime | null>(null)
+
+/** 在 Provider 内读取审批能力；不在 Provider 内返回 null。 */
+export function useApprovalRuntime(): ApprovalRuntime | null {
+  return useContext(ApprovalRuntimeContext)
+}
 
 /**
  * 把 AG-UI 后端接成 assistant-ui 运行时。
@@ -43,9 +62,33 @@ export function AgUiRuntimeProvider({
 
   const runtime = useAgUiRuntime({ agent, onError })
 
+  const approvalRuntime = useMemo<ApprovalRuntime>(() => {
+    // `runtime.thread` 是 `ThreadRuntime`（API 类型），它把 `respondToToolApproval`
+    // 藏在 `__internal_threadBinding` 里（由 AG-UI 适配器的 `onRespondToToolApproval`
+    // 回填）。这里做一次精确收窄，避免依赖 store schema 补丁。
+    const binding = (runtime.thread as unknown as {
+      __internal_threadBinding?: {
+        respondToToolApproval: ApprovalRuntime["respondToToolApproval"]
+      }
+    }).__internal_threadBinding
+    return {
+      respondToToolApproval: (options) => {
+        const responder =
+          binding?.respondToToolApproval ??
+          ((runtime.thread as unknown as ApprovalRuntime).respondToToolApproval ??
+            (() => {
+              throw new Error("respondToToolApproval 不可用：审批能力未接入运行时")
+            }))
+        return responder(options)
+      },
+    }
+  }, [runtime])
+
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      {children}
+      <ApprovalRuntimeContext.Provider value={approvalRuntime}>
+        {children}
+      </ApprovalRuntimeContext.Provider>
     </AssistantRuntimeProvider>
   )
 }

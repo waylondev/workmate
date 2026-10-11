@@ -63,7 +63,7 @@ export function ConversationSummaryPanel({
   }, [agentId, reloadKey])
 
   return (
-    <aside className="border-border/60 bg-muted/20 flex w-72 shrink-0 flex-col border-l">
+    <aside className="glass border-border/60 relative z-10 flex w-72 shrink-0 flex-col border-l">
       <header className="flex h-14 shrink-0 items-center gap-1 px-3">
         <span className="text-sm font-medium">对话摘要</span>
         <div className="ms-auto flex items-center gap-1">

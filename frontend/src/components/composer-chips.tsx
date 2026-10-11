@@ -110,7 +110,7 @@ function AgentChip({ agentId, onSelect }: { agentId: string; onSelect: (agentId:
       {open && (
         <div
           role="menu"
-          className="bg-popover text-popover-foreground absolute bottom-full left-0 z-50 mb-1.5 w-60 rounded-xl border p-1 shadow-lg"
+          className="glass bg-popover/90 text-popover-foreground absolute bottom-full left-0 z-50 mb-1.5 w-60 rounded-xl border p-1 shadow-xl"
         >
           {AGENTS.map((item) => (
             <button
