@@ -45,6 +45,6 @@ class ApiExceptionHandler {
 
 	private fun problem(status: HttpStatus, detail: String, exchange: ServerWebExchange): ProblemDetail =
 		ProblemDetail.forStatusAndDetail(status, detail).apply {
-			instance = exchange.request.path
+			instance = exchange.request.uri
 		}
 }
