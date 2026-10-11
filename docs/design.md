@@ -61,7 +61,7 @@
 | **定时任务** | `POST /api/jobs` 创建 cron / `GET` 列表（含已触发次数）/ `DELETE` 取消 |
 | **前端** | 三栏外壳（左栏导航 + 中栏对话 + 右栏「对话摘要」实时工作进度） |
 
-**不做**：数据库、多租户、用户体系、会话池诊断接口、任务定义持久化（重启后定时任务丢失，属已知限制）。
+**不做**：数据库、多租户、用户体系、会话池诊断接口。
 
 ## 1. 存储决策
 
@@ -80,7 +80,7 @@
 | 会话目录（标题、所属 agent、更新时间） | 浏览器 localStorage | 与浏览器同寿 |
 | 技能 | `.agentscope/workspace/{agentId}/skills/<name>/SKILL.md` | 与磁盘同寿（删除 = 归档） |
 | agent 定义 | `application.yaml` 的 `workmate.agents` | 随进程 |
-| 定时任务定义 | 进程内 `ConcurrentHashMap` | **随进程**（已知限制） |
+| 定时任务定义 | `.agentscope/jobs.json`（`JobDefinitionStore` 落盘） | 与磁盘同寿（重启恢复） |
 
 ## 2. 总体架构
 
@@ -192,7 +192,9 @@
 | `GET /api/jobs` | 含 `id`（官方任务对象 id）/ `agentId` / `cron` / `executions`（已触发次数） |
 | `DELETE /api/jobs/{name}` | 幂等，`cancelled=false` 表示本就不存在 |
 
-任务定义**不持久化**，进程重启后丢失 —— 官方扩展未提供任务存储，引入需自行落盘，属未做项。
+任务定义**已持久化**：`JobDefinitionStore` 把 `name → {agentId, cron}` 落盘到 `.agentscope/jobs.json`
+（运行态数据，随 `.agentscope/` 被 `.gitignore` 忽略），`JobSchedulerService` 启动时加载并重新注册回
+Quartz，创建/取消时同步写回。落盘失败只记日志、不阻断已注册的任务；文件损坏时视为空启动。
 
 ### 3.5 错误契约
 
@@ -253,8 +255,9 @@
 | P2 | Agent 管理（列表 + 可逆注销 + 管理页） | ✅ 已实测 |
 | P3 | 技能管理（来源仓库 + 归档删除 + 管理页） | ✅ 已实测 |
 | P4 | 定时任务（cron 创建 / 列表 / 取消，真实触发已验证） | ✅ 已实测 |
+| P4.1 | 定时任务定义持久化（落盘 + 重启恢复） | ✅ 已实测 |
 | P5 | 三栏前端外壳（左栏 / 中栏 / 右栏工作进度） | ✅ 已构建 + SSR 校验 |
-| — | 任务定义持久化、服务端会话列表与删除 | ⬜ 未做（见 §3.1 / §3.4） |
+| — | 服务端会话列表与删除 | ⬜ 未做（见 §3.1） |
 
 ## 5. 官方 API 核销
 
@@ -265,7 +268,6 @@
 | # | 限制 | 影响 | 说明 |
 |---|---|---|---|
 | 1 | **定时任务无 workspace / 记忆 / 技能 / 权限引擎** | 定时跑的 agent 是轻量 `ReActAgent`，不是完整的 `HarnessAgent` | 官方 `createAgent()` 语义决定，非本项目可绕 |
-| 2 | **定时任务定义不持久化** | 进程重启后任务丢失 | 官方扩展未提供存储 |
-| 3 | **复用带未决审批的 threadId 需先 resume** | 裸客户端未 resume 就复用会收到 `RUN_ERROR: Thread has unresolved interrupts` | 这是 AG-UI 的 interrupt 契约，不是缺陷；前端 `tool-fallback.aui.tsx` 用 `respondToApproval` / `addResult` 解决 |
-| 4 | **技能删除依赖 `setWriteable` 临时开闸** | 并发删除同一技能存在竞态窗口 | 单机管理面可接受；若要严格化需仓库层支持原子归档 |
-| 5 | **agent 定义不可运行时增删改** | 只支持注册态切换 | 定义来自 yaml，属未做项 |
+| 2 | **复用带未决审批的 threadId 需先 resume** | 裸客户端未 resume 就复用会收到 `RUN_ERROR: Thread has unresolved interrupts` | 这是 AG-UI 的 interrupt 契约，不是缺陷；前端 `tool-fallback.aui.tsx` 用 `respondToApproval` / `addResult` 解决 |
+| 3 | **技能删除依赖 `setWriteable` 临时开闸** | 并发删除同一技能存在竞态窗口 | 单机管理面可接受；若要严格化需仓库层支持原子归档 |
+| 4 | **agent 定义不可运行时增删改** | 只支持注册态切换 | 定义来自 yaml，属未做项 |

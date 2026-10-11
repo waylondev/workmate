@@ -22,7 +22,8 @@ import java.util.concurrent.ConcurrentHashMap
  * <p>官方 `agentscope-extensions-scheduler` 是聚合 POM（无 jar），实际代码在
  * `agentscope-extensions-scheduler-quartz`。核心接口 [AgentScheduler]，实现 [QuartzAgentScheduler]。
  *
- * <p>由于官方扩展无自动配置，这里手动装配成 Spring Bean。任务定义持久化属后续增强。
+ * <p>由于官方扩展无自动配置，这里手动装配成 Spring Bean。任务定义经 [JobDefinitionStore]
+ * 落盘到 `.agentscope/jobs.json`（运行态数据，重启后恢复）。
  */
 @Configuration(proxyBeanMethods = false)
 class JobSchedulerConfiguration {
@@ -35,11 +36,22 @@ class JobSchedulerConfiguration {
 			.build()
 
 	@Bean
+	fun jobDefinitionStore(): JobDefinitionStore =
+		JobDefinitionStore(JOB_DEFINITIONS_FILE)
+
+	@Bean
 	fun jobSchedulerService(
 		scheduler: AgentScheduler,
 		model: Model,
 		properties: WorkmateProperties,
-	): JobSchedulerService = JobSchedulerService(scheduler, model, properties)
+		store: JobDefinitionStore,
+	): JobSchedulerService = JobSchedulerService(scheduler, model, properties, store)
+
+	private companion object {
+		/** 任务定义落盘位置：运行态数据，随 `.agentscope/` 一起被 `.gitignore` 忽略。 */
+		val JOB_DEFINITIONS_FILE: java.nio.file.Path =
+			java.nio.file.Path.of(".agentscope", "jobs.json")
+	}
 }
 
 /**
@@ -74,9 +86,17 @@ class JobSchedulerService(
 	private val scheduler: AgentScheduler,
 	private val model: Model,
 	private val properties: WorkmateProperties,
+	private val store: JobDefinitionStore,
 ) {
 
 	private val definitions = ConcurrentHashMap<String, JobDefinition>()
+
+	private val log = org.slf4j.LoggerFactory.getLogger(JobSchedulerService::class.java)
+
+	init {
+		// 进程重启后恢复：把持久化的任务定义重新注册回 Quartz（Quartz 本身是内存态）
+		store.load().forEach { def -> reschedule(def) }
+	}
 
 	/**
 	 * 注册一个 cron 定时任务：到点以指定 agent 的 sysPrompt 跑一次模型调用。
@@ -120,7 +140,8 @@ class JobSchedulerService(
 		@Suppress("UNCHECKED_CAST")
 		val task = scheduler.schedule(agentConfig, scheduleConfig) as ScheduleAgentTask<Msg>
 
-		definitions[name] = JobDefinition(agentId = agentId, cron = cron)
+		definitions[name] = JobDefinition(name = name, agentId = agentId, cron = cron)
+		persist()
 
 		return JobView(
 			name = name,
@@ -135,7 +156,7 @@ class JobSchedulerService(
 	fun cancel(jobName: String): Boolean {
 		val name = jobName.trim()
 		val cancelled = scheduler.cancel(name)
-		definitions.remove(name)
+		if (definitions.remove(name) != null) persist()
 		return cancelled
 	}
 
@@ -167,10 +188,36 @@ class JobSchedulerService(
 	/** 已触发次数。官方仅在 [BaseScheduleAgentTask] 上暴露该计数。 */
 	private fun executionCount(jobName: String): Long =
 		(scheduler.getScheduledAgent(jobName) as? BaseScheduleAgentTask)?.executionCount ?: 0L
+
+	/** 把持久化的定义重新注册回 Quartz（启动恢复用）。恢复失败只记日志，不阻断启动。 */
+	private fun reschedule(def: JobDefinition) {
+		val declared = properties.agents[def.agentId] ?: run {
+			log.warn("skip restoring job '{}': agent '{}' no longer declared", def.name, def.agentId)
+			return
+		}
+		try {
+			val agentConfig = AgentConfig.builder()
+				.name(def.name)
+				.sysPrompt(declared.sysPrompt)
+				.modelConfig(SharedModelConfig(model))
+				.build()
+			val scheduleConfig = ScheduleConfig.builder().cron(def.cron).build()
+			@Suppress("UNCHECKED_CAST")
+			scheduler.schedule(agentConfig, scheduleConfig) as ScheduleAgentTask<Msg>
+			definitions[def.name] = def
+		} catch (e: Exception) {
+			log.warn("skip restoring job '{}': {}", def.name, e.message)
+		}
+	}
+
+	/** 把当前定义快照落盘。 */
+	private fun persist() {
+		try {
+			store.save(definitions.values.toList())
+		} catch (e: Exception) {
+			// 落盘失败不应破坏已注册成功的任务；记日志，任务仍在本进程内可用
+			log.error("failed to persist job definitions", e)
+		}
+	}
 }
 
-/** 任务定义（官方任务对象不保留 agentId，业务侧自留一份）。 */
-private data class JobDefinition(
-	val agentId: String,
-	val cron: String,
-)

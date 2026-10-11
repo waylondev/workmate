@@ -96,7 +96,8 @@ workmate/
 │   │   ├── SkillAdminService.kt        # 技能枚举 / 归档删除（复用官方 AgentSkillRepository）
 │   │   └── SkillController.kt          # /api/agents/{id}/skills
 │   ├── job/
-│   │   ├── JobSchedulerConfiguration.kt # Quartz 调度 Bean（官方扩展）
+│   │   ├── JobSchedulerConfiguration.kt # Quartz 调度 Bean（官方扩展）+ JobSchedulerService
+│   │   ├── JobDefinitionStore.kt        # 任务定义落盘（.agentscope/jobs.json，重启恢复）
 │   │   └── JobController.kt            # /api/jobs：创建 / 列表 / 取消
 │   └── web/
 │       ├── ApiException.kt             # 业务异常 → HTTP 状态码
