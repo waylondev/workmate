@@ -6,8 +6,7 @@ management:
   endpoints:
     web:
       exposure:
-        # 只支持 "*" 或 "*后缀" 两种通配；agentscope-* 这类前缀通配会被 EndpointId 校验拒绝。
-        # 类路径上仅 health/info 与 agentscope-admin 的 agentscope-* 端点，故直接全放开。
+        # 只支持 "*" 或 "*后缀" 两种通配；仅 health/info 等基础端点，直接全放开。
         include: "*"
 
 # AgentScope：仅使用官方 starter 的自动配置能力
@@ -18,9 +17,10 @@ agentscope:
   model:
     provider: openai
   openai:
-    api-key: ${OPENAI_API_KEY:}
-    model-name: ${OPENAI_MODEL:gpt-4.1-mini}
-    base-url: ${OPENAI_BASE_URL:}
+    # 本地 Ollama 走 OpenAI 兼容端点；Ollama 不校验 key，但多数 starter 要求非空，故给占位值
+    api-key: ${OPENAI_API_KEY:ollama}
+    model-name: ${OPENAI_MODEL:qwen2.5:1.5b}
+    base-url: ${OPENAI_BASE_URL:http://localhost:11434/v1}
     stream: true
   agui:
     path-prefix: /agui
@@ -28,9 +28,6 @@ agentscope:
     default-agent-id: default
     enable-reasoning: true
     emit-token-usage: true
-  admin:
-    # 官方管控面（actuator 端点 + 审计 + 用量），默认关闭需显式开启
-    enabled: true
 
 # 业务侧 agent 目录：key 即 agent id，同时是 AG-UI 路由段
 workmate:

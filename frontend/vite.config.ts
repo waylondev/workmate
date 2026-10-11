@@ -12,9 +12,13 @@ export default defineConfig({
     },
   },
   server: {
-    // 开发期把 AG-UI 端点代理到后端，前端只认同源路径 /agui，避免 CORS 与硬编码端口
+    // 开发期把 AG-UI 端点与业务 REST 代理到后端，前端只认同源路径，避免 CORS 与硬编码端口
     proxy: {
       '/agui': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
       },

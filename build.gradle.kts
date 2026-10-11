@@ -25,8 +25,10 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("io.agentscope:agentscope-harness:$agentscopeVersion")
 	implementation("io.agentscope:agentscope-agui-spring-boot-starter:$agentscopeVersion")
-	implementation("io.agentscope:agentscope-admin-spring-boot-starter:$agentscopeVersion")
 	implementation("io.agentscope:agentscope-openai-spring-boot-starter:$agentscopeVersion")
+	// 定时任务调度（栈无关，Quartz 实现；common 需显式引入，因 quartz 对它是 provided+optional 不传递）
+	implementation("io.agentscope:agentscope-extensions-scheduler-common:$agentscopeVersion")
+	implementation("io.agentscope:agentscope-extensions-scheduler-quartz:$agentscopeVersion")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
 	testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")

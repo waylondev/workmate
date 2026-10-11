@@ -1,10 +1,8 @@
 package org.waylon.workmate.agent
 
 import io.agentscope.core.model.Model
-import io.agentscope.spring.boot.admin.registry.AgentRegistry
 import io.agentscope.spring.boot.agui.common.AguiAgentRegistryCustomizer
 import io.agentscope.spring.boot.agui.common.AguiProperties
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -22,8 +20,7 @@ class AgentConfiguration {
 	fun agentCatalog(
 		model: Model,
 		properties: WorkmateProperties,
-		adminRegistry: ObjectProvider<AgentRegistry>,
-	) = AgentCatalog(model, properties, adminRegistry)
+	) = AgentCatalog(model, properties)
 
 	@Bean
 	fun aguiAgentRegistrar(

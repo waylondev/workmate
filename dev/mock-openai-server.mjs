@@ -27,8 +27,6 @@ const chunk = (delta, finishReason = null) =>
     choices: [{ index: 0, delta, finish_reason: finishReason }],
   })}\n\n`;
 
-let sysLogged = false;
-
 const server = createServer(async (req, res) => {
   const { pathname } = new URL(req.url, "http://localhost");
 
@@ -43,15 +41,6 @@ const server = createServer(async (req, res) => {
   let body = "";
   for await (const b of req) body += b;
   const payload = JSON.parse(body || "{}");
-  if (!sysLogged) {
-    sysLogged = true;
-    const sys = (payload.messages ?? []).find((m) => m.role === "system");
-    const sc = typeof sys?.content === "string" ? sys.content : JSON.stringify(sys?.content ?? "");
-    console.log("[mock-openai] systemPrompt.length:", sc.length);
-    console.log("[mock-openai] hasPersona(目标即服务):", sc.includes("目标即服务"));
-    console.log("[mock-openai] hasMemory(长期记忆):", sc.includes("长期记忆"));
-    console.log("[mock-openai] hasKnowledge(领域知识):", sc.includes("领域知识"));
-  }
   const lastUser = [...(payload.messages ?? [])]
     .reverse()
     .find((m) => m.role === "user");
