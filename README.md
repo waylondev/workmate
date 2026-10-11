@@ -44,8 +44,9 @@ AgentScope 相关依赖（`io.agentscope:2.0.4`）：
 
 | 分类 | 选型 | 版本 |
 | --- | --- | --- |
-| 框架 | React + TypeScript | 19.2 / 6.0 |
-| 构建 | Vite + `@vitejs/plugin-react` | 8.3 |
+| 框架 | React + TypeScript | 19 / 6.0 |
+| 构建 | Vite | 8.3 |
+| React 插件 | `@vitejs/plugin-react` | 6.1 |
 | 样式 | Tailwind CSS（`@tailwindcss/vite`） | 4.3 |
 | 聊天运行时 | `@assistant-ui/react` | 0.15.27 |
 | AG-UI 适配器 | `@assistant-ui/react-ag-ui` | 0.0.67 |
@@ -58,6 +59,8 @@ AgentScope 相关依赖（`io.agentscope:2.0.4`）：
 `@ag-ui/client` 必须锁 `0.0.59`：`react-ag-ui@0.0.67` 的 peer 范围是 `^0.0.59`，装 1.x 会导致 `AbstractAgent` 出现两份实例、类型与运行时都不一致。
 
 `src/components/` 下的浅色 UI 组件（thread / reasoning / tool-fallback / tool-group / markdown-text / attachment 等）由 assistant-ui 官方 CLI 生成，属仓库自有源码，可直接改样式。
+
+`src/agents.ts` 是前端的 agent 目录（与后端 `workmate.agents` 一一对应），顶栏用分段控件切换 `default / coder / explorer`；切换时以 `key` 重挂载运行时，每个 agent 是一段独立会话。
 
 ## 目录结构
 
@@ -73,9 +76,11 @@ workmate/
 ├── src/main/resources/application.yaml # 全部运行时配置
 ├── frontend/                           # 前端工程（独立根目录）
 │   ├── src/ag-ui-runtime-provider.tsx  # AG-UI 运行时接入
+│   ├── src/agents.ts                   # 前端 agent 目录（顶栏切换用）
 │   ├── src/components/                 # assistant-ui CLI 生成的聊天组件
 │   ├── src/lib/utils.ts                # cn 工具
 │   └── vite.config.ts                  # Tailwind 插件 + @ 别名 + /agui 代理
+├── dev/mock-openai-server.mjs          # 本地 mock 模型（无 API Key 联调用）
 └── build.gradle.kts
 ```
 
@@ -119,11 +124,12 @@ workmate:
 
 ## 本地开发
 
-前置：JDK 25、Node 20+、pnpm 10。
+前置：JDK 25、Node 20+、pnpm 10。Gradle 的 Java toolchain 要求 25，若系统默认 JDK 不是 25，先设 `JAVA_HOME` 指向 JDK 25。
 
 ```bash
-# 后端（8080）
+# 后端（8080）：配置真实 OpenAI 兼容模型
 export OPENAI_API_KEY=sk-...
+export OPENAI_BASE_URL=...        # 可选，默认官方端点
 ./gradlew.bat bootRun
 
 # 前端（5173）
@@ -132,7 +138,36 @@ cd frontend && pnpm install && pnpm dev
 
 打开 http://localhost:5173 。前端把 `/agui` 代理到 `http://localhost:8080`，所以只需启动后端即可，无跨域问题。
 
-不配 `OPENAI_API_KEY` 也能启动与打开页面，只是发送消息时模型调用会失败。
+### 无 API Key 时的联调
+
+不配 Key 也能启动，但发消息时模型调用会失败。仓库自带了本地 mock 模型，用于验证完整链路：
+
+```bash
+# 1. 起 mock（11434，返回 OpenAI 兼容 SSE 流）
+node dev/mock-openai-server.mjs
+
+# 2. 后端指向 mock（另开终端）
+export OPENAI_API_KEY=mock-key
+export OPENAI_BASE_URL=http://127.0.0.1:11434/v1
+./gradlew.bat bootRun
+
+# 3. 前端照常
+cd frontend && pnpm dev
+```
+
+mock 会回显你的问题并返回一段固定文案，证明 `AG-UI SSE → HarnessAgent → Model` 全链路可用。
+
+### 验证对话服务
+
+不用浏览器也能冒烟：POST 一个 AG-UI `RunAgentInput`，观察 SSE 事件流是否完整：
+
+```bash
+curl -N http://localhost:5173/agui/run/default \
+  -H 'Content-Type: application/json' -H 'Accept: text/event-stream' \
+  -d '{"threadId":"t1","runId":"r1","tools":[],"context":[],"forwardedProps":{},"state":{},"messages":[{"id":"m1","role":"user","content":"你好"}]}'
+```
+
+正常时应依次输出 `RUN_STARTED → TEXT_MESSAGE_START → TEXT_MESSAGE_CONTENT* → TEXT_MESSAGE_END → RUN_FINISHED`。
 
 ## AG-UI 端点
 

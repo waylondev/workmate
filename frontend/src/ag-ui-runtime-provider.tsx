@@ -4,26 +4,29 @@ import { useAgUiRuntime } from "@assistant-ui/react-ag-ui"
 import { useMemo, type ReactNode } from "react"
 
 /**
- * 后端 AG-UI 端点。`run/{agentId}` 中的 agentId 对应后端 workmate.agents 的 key。
- * 用同源相对路径，开发期由 Vite 代理转发到 Spring Boot，生产期由网关/Nginx 转发。
- */
-const AGUI_URL = "/agui/run/default"
-
-/**
  * 把 AG-UI 后端接成 assistant-ui 运行时。
  *
  * <p>事件解析（TEXT_MESSAGE_* / TOOL_CALL_* / RUN_* 等）全部由适配器完成，
  * 页面侧只需渲染官方 Thread 组件，无需自行处理 SSE 与状态机。
+ *
+ * <p>调用方用 `key={agentId}` 重新挂载本组件即可切换 Agent：切换会重建 HttpAgent、
+ * 运行时与线程（每个 Agent 是一段独立会话）。同源相对路径在开发期由 Vite 代理到后端。
  */
-export function AgUiRuntimeProvider({ children }: { children: ReactNode }) {
+export function AgUiRuntimeProvider({
+  agentId,
+  children,
+}: {
+  agentId: string
+  children: ReactNode
+}) {
   const agent = useMemo(
     () =>
       new HttpAgent({
-        url: AGUI_URL,
+        url: `/agui/run/${agentId}`,
         threadId: crypto.randomUUID(),
         headers: { Accept: "text/event-stream" },
       }),
-    [],
+    [agentId],
   )
 
   const runtime = useAgUiRuntime({ agent })
