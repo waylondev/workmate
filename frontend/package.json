@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "check:ui": "vite build --ssr scripts/ui-check.tsx --outDir .ui-check --emptyOutDir --logLevel error && node .ui-check/ui-check.js",
+    "check:agui": "vite build --ssr scripts/agui-pipeline-check.ts --outDir .agui-check --emptyOutDir --logLevel error && node .agui-check/agui-pipeline-check.js",
     "lint": "oxlint",
     "preview": "vite preview"
   },

@@ -25,3 +25,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# AG-UI 事件管线校验产物（由 pnpm check:agui 生成）
+.agui-check

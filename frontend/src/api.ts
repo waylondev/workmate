@@ -133,12 +133,3 @@ export async function listJobs(): Promise<JobMeta[]> {
 export async function cancelJob(jobName: string): Promise<JobCancellation> {
   return json<JobCancellation>(`${BASE}/jobs/${jobName}`, { method: "DELETE" })
 }
-
-// ---- 会话 ----
-// 只封装前端真正用到的能力：删除本地会话对应的**服务端会话池槽位**。
-// 后端还有 `GET /api/sessions`（内存会话池诊断视图），当前界面无消费方，
-// 因此不在本模块里留一个没人调用的包装。
-
-export async function deleteSession(threadId: string): Promise<{ threadId: string; removed: boolean }> {
-  return json(`${BASE}/sessions/${threadId}`, { method: "DELETE" })
-}

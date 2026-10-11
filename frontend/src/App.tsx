@@ -1,6 +1,6 @@
 import { AgUiRuntimeProvider } from "@/ag-ui-runtime-provider"
+import { classifyAguiFailure, type AguiFailure } from "@/agui-errors"
 import { AGENTS, agentById } from "@/agents"
-import { deleteSession as deleteSessionRemote } from "@/api"
 import { AdminPanel } from "@/AdminPanel"
 import { ChatChromeProvider, type ChatChrome, type PanelSection } from "@/chat-chrome"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -18,7 +18,7 @@ import {
   type ChatSession,
 } from "@/sessions"
 import { useAuiState } from "@assistant-ui/react"
-import { PanelLeftIcon, PanelRightIcon, SquarePenIcon } from "lucide-react"
+import { AlertTriangleIcon, PanelLeftIcon, PanelRightIcon, SquarePenIcon, XIcon } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 /**
@@ -37,10 +37,22 @@ export default function App() {
   })
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [panelOpen, setPanelOpen] = useState(true)
+  /** 会话在服务端卡在待授权时的出路提示；正常失败仍由消息内的错误区展示。 */
+  const [failure, setFailure] = useState<AguiFailure | null>(null)
 
   useEffect(() => {
     persistSessions(sessions)
   }, [sessions])
+
+  // 换会话/换 agent 即视为换了一条服务端会话，旧提示不再适用
+  useEffect(() => {
+    setFailure(null)
+  }, [threadId, agentId])
+
+  const handleRunError = useCallback((error: Error) => {
+    const classified = classifyAguiFailure(error)
+    if (classified) setFailure(classified)
+  }, [])
 
   const currentSession = useMemo(
     () => sessions.find((session) => session.threadId === threadId),
@@ -66,10 +78,8 @@ export default function App() {
     setNav("chat")
   }
 
+  /** 从本地最近列表移除（前端目录）。服务端转录由后端 SessionTree 持有，不受影响。 */
   const deleteSession = (id: string) => {
-    void deleteSessionRemote(id).catch(() => {
-      // 服务端会话池是诊断视图，删除失败不阻塞本地目录清理
-    })
     setSessions((prev) => {
       const next = prev.filter((session) => session.threadId !== id)
       if (id === threadId) {
@@ -153,7 +163,12 @@ export default function App() {
 
         <div className="flex min-w-0 flex-1">
           {nav === "chat" ? (
-            <AgUiRuntimeProvider key={threadId} agentId={activeAgentId} threadId={threadId}>
+            <AgUiRuntimeProvider
+              key={threadId}
+              agentId={activeAgentId}
+              threadId={threadId}
+              onError={handleRunError}
+            >
               <ChatChromeProvider value={chrome}>
                 <SessionTitler threadId={threadId} onTitle={applyTitle} />
 
@@ -167,6 +182,13 @@ export default function App() {
                     onTogglePanel={() => setPanelOpen((open) => !open)}
                     onNewChat={createSession}
                   />
+                  {failure && (
+                    <StaleApprovalNotice
+                      failure={failure}
+                      onNewChat={createSession}
+                      onDismiss={() => setFailure(null)}
+                    />
+                  )}
                   <div className="min-h-0 flex-1">
                     <Thread components={{ Welcome: () => <Welcome agentId={activeAgentId} /> }} />
                   </div>
@@ -241,6 +263,69 @@ function ChatHeader({
   )
 }
 
+/**
+ * 「会话卡在待授权」提示条。
+ *
+ * <p>这类失败无法在当前会话内恢复（后端进程重启或页面刷新后，客户端与后端各自丢掉
+ * 一部分待确认状态），所以不给「重试」这种假出路，只给新建会话与关闭。
+ */
+function StaleApprovalNotice({
+  failure,
+  onNewChat,
+  onDismiss,
+}: {
+  failure: AguiFailure
+  onNewChat: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <div
+      data-slot="agui-stale-approval-notice"
+      role="alert"
+      className="border-destructive/30 bg-destructive/5 text-foreground mx-3 mt-3 flex shrink-0 items-start gap-3 rounded-lg border p-3 text-sm"
+    >
+      <AlertTriangleIcon aria-hidden className="text-destructive mt-0.5 size-4 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="font-medium">{failure.title}</p>
+        {failure.pendingTools.length > 0 && (
+          <p className="text-muted-foreground mt-1 text-xs">
+            待确认的工具：
+            <code className="bg-muted ms-1 rounded px-1.5 py-0.5">
+              {failure.pendingTools.join(", ")}
+            </code>
+          </p>
+        )}
+        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{failure.detail}</p>
+        <div className="mt-2.5 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onNewChat}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors"
+          >
+            <SquarePenIcon className="size-3.5" aria-hidden />
+            新建会话继续
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex h-7 items-center rounded-md px-2.5 text-xs transition-colors"
+          >
+            关闭提示
+          </button>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="关闭提示"
+        className="text-muted-foreground hover:text-foreground shrink-0 rounded-md p-1 transition-colors"
+      >
+        <XIcon className="size-3.5" aria-hidden />
+      </button>
+    </div>
+  )
+}
+
 function AdminHeader({
   nav,
   sidebarOpen,
@@ -249,8 +334,7 @@ function AdminHeader({
   nav: Exclude<NavKey, "chat">
   sidebarOpen: boolean
   onToggleSidebar: () => void
-}) {
-  return (
+}) {  return (
     <header className="border-border/60 bg-background/80 flex h-14 shrink-0 items-center gap-1 border-b px-3 backdrop-blur">
       {!sidebarOpen && (
         <TooltipIconButton tooltip="展开侧栏" onClick={onToggleSidebar} aria-label="展开侧栏">

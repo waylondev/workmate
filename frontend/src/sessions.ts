@@ -1,8 +1,9 @@
 // 本地会话目录：threadId → 展示信息。
 //
 // 这里只存**界面需要的目录**（标题、所属 agent、更新时间）到 localStorage；
-// 真正的对话转录由后端官方 SessionTree 按 `agents/{agentId}/sessions/{threadId}.jsonl`
-// 落盘，两者职责不重叠。见 docs/design.md 与 SessionController 的说明。
+// 真正的对话转录由后端官方 SessionTree 落盘在
+// `.agentscope/workspace/{agentId}/{threadId}/agents/{AgentName}/sessions/{threadId}.jsonl`，
+// 两者职责不重叠。因此在侧栏删除会话 = 从本地最近列表移除，**不影响服务端转录**。
 
 export type ChatSession = {
   threadId: string
