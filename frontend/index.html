@@ -5,6 +5,18 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Workmate</title>
+    <script>
+      // 首屏前就定位深色模式，避免主题闪烁（与 ThemeToggle 共用同一存储键）
+      try {
+        var t = localStorage.getItem("workmate-theme");
+        if (t !== "light" && t !== "dark") {
+          t = matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+        }
+        if (t === "dark") document.documentElement.classList.add("dark");
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

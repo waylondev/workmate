@@ -430,9 +430,13 @@ const ThreadScrollToBottom: FC = () => {
 
 const ThreadWelcome: FC = () => {
   return (
-    <div className="aui-thread-welcome-root mb-6 flex flex-col px-2">
-      <p className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-2xl font-medium tracking-tight duration-200">
+    <div className="aui-thread-welcome-root fade-in slide-in-from-bottom-1 animate-in fill-mode-both mb-8 flex flex-col items-center px-4 text-center duration-200">
+      <h1 className="text-foreground text-3xl font-semibold tracking-tight text-balance">
         How can I help you today?
+      </h1>
+      <p className="text-muted-foreground mt-2.5 max-w-md text-[15px] leading-relaxed text-pretty">
+        I can reason step by step, work through tools, and pause for your
+        approval before taking risky actions.
       </p>
     </div>
   );
