@@ -1,9 +1,11 @@
 # Workmate 功能设计文档
 
 > 状态：**已实现，且已在本机对真实模型完成端到端联调验证**。
-> 逐项结果见 `docs/verification-report.md`；复现：`bash dev/verify-all.sh`。
+> 逐项结果见 `docs/verification-report.md`。
 >
 > 与 `README.md` 的分工：README 讲「怎么跑」，本文讲「为什么这么设计、边界在哪」。
+> 高层架构见 `architecture.md`，技术决策（ADR）见 `adr/`，API 契约见 `api.md`，
+> 待做清单见 `roadmap.md`。
 >
 > 原则：**不引入数据库**，存储完全基于 AgentScope 官方能力，只在官方「积木」之上搭薄层。
 

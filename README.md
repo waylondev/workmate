@@ -125,6 +125,15 @@ workmate/
 │   ├── scripts/agui-pipeline-check.ts  # HITL 审批管线校验（pnpm check:agui）
 │   └── vite.config.ts                  # Tailwind 插件 + @ 别名 + /agui + /api 代理
 ├── dev/OLLAMA_联调启动说明.md        # 本机模型（CPA）联调启动步骤
+├── AGENTS.md                           # 工程规范（编程思想 / 完成定义）
+├── CONTRIBUTING.md                     # 贡献指南
+├── LICENSE                             # Apache-2.0
+├── docs/requirements.md                # 需求与范围
+├── docs/architecture.md                # 架构分层与核心原则
+├── docs/roadmap.md                     # 路线图（已实现 / 待做）
+├── docs/design.md                      # 功能设计（为什么这么设计）
+├── docs/api.md                         # API 契约（REST + AG-UI）
+├── docs/adr/                           # 技术决策记录（ADR）
 ├── docs/verification-report.md         # 联调验证报告
 ├── docs/frontend-enhancement-report.md # 前端功能增强验证报告
 └── build.gradle.kts
