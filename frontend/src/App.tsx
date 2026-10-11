@@ -40,7 +40,7 @@ export default function App() {
   const [panelOpen, setPanelOpen] = useState(true)
   /** 会话在服务端卡在待授权时的出路提示；正常失败仍由消息内的错误区展示。 */
   const [failure, setFailure] = useState<AguiFailure | null>(null)
-  /** 本会话内「自动批准」开关：开启后新出现的工具授权自动放行。 */
+  /** 本会话内「自动批准」开关：开启后新出现的工具授权自动放行（内存态，不落盘）。 */
   const [allowAll, setAllowAll] = useState(false)
 
   useEffect(() => {
@@ -193,7 +193,7 @@ export default function App() {
                     />
                   )}
                   <ApprovalBanner
-                    persistApprovals={allowAll}
+                    autoApprove={allowAll}
                     onAllowAllChange={setAllowAll}
                   />
                   <div className="min-h-0 flex-1">

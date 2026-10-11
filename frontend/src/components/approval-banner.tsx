@@ -21,18 +21,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
  * 工具卡才能发现需要授权。
  *
  * <p>「全部允许」会一次性批准当前所有待授权项；「允许」只批准第一个。
- * 持久化开关（本会话内记住选择）由调用方传入 `persistApprovals` 控制。
+ * 「本会话自动批准」开关（`autoApprove`）由调用方持有并传入：开启后本会话
+ * 内后续出现的授权会自动放行，属内存态、不落盘。
  */
 export function ApprovalBanner({
   className,
   onAllowAllChange,
-  persistApprovals,
+  autoApprove,
 }: {
   className?: string
-  /** 「全部允许」开关状态回传（本会话内记住）。 */
+  /** 「本会话自动批准」开关状态回传（内存态，调用方持有）。 */
   onAllowAllChange?: (enabled: boolean) => void
-  /** 用户是否已开启「本会话全部允许」，开启后自动批准新出现的授权。 */
-  persistApprovals?: boolean
+  /** 是否已开启「本会话自动批准」，开启后自动批准新出现的授权。 */
+  autoApprove?: boolean
 }) {
   const approvalRuntime = useApprovalRuntime()
   const messages = useAuiState((s) => s.thread.messages)
@@ -44,8 +45,8 @@ export function ApprovalBanner({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 「全部允许」开关：本会话内记住，勾选后自动批准后续出现的授权。
-  const allowAll = persistApprovals ?? false
+  // 「本会话自动批准」开关状态（由调用方持有，本组件只读）。
+  const allowAll = autoApprove ?? false
 
   const respond = useCallback(
     async (approvalId: string, approved: boolean) => {
@@ -187,15 +188,6 @@ export function ApprovalBanner({
         ) : null}
       </div>
     </div>
-  )
-}
-
-/** 是否仍有待授权项（供外壳决定是否渲染横幅占位）。 */
-export function useHasPendingApprovals(): boolean {
-  const messages = useAuiState((s) => s.thread.messages)
-  return useMemo(
-    () => derivePendingApprovals(messages).length > 0,
-    [messages],
   )
 }
 

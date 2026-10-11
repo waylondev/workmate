@@ -1,4 +1,4 @@
-import type { AssistantState } from "@assistant-ui/react"
+import type { ThreadMessages, ToolCallPart } from "@/thread-types"
 
 /**
  * 一条待用户决策的工具授权。
@@ -17,10 +17,6 @@ export type PendingApproval = {
   prompt?: string
 }
 
-export type ThreadMessages = AssistantState["thread"]["messages"]
-type Part = ThreadMessages[number]["parts"][number]
-type ToolPart = Extract<Part, { type: "tool-call" }>
-
 /**
  * 从线程消息里派生全部待授权项。
  *
@@ -35,11 +31,11 @@ export function derivePendingApprovals(
     if (message.role !== "assistant") continue
     for (const part of message.parts) {
       if (part.type !== "tool-call") continue
-      const approval = (part as ToolPart).approval
+      const approval = (part as ToolCallPart).approval
       if (
         approval == null ||
         approval.approved !== undefined ||
-        (approval as { resolution?: unknown }).resolution !== undefined
+        approval.resolution !== undefined
       ) {
         continue
       }

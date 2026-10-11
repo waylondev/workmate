@@ -35,7 +35,7 @@
 
 - **待授权判定**：`approval.approved === undefined` 且无 `resolution`（与工具卡 `requires-action` 互为表里，但直接从消息树派生，横幅不依赖工具卡渲染）。
 - **全部允许**：循环调用 `respondToToolApproval({ approvalId, approved: true })`。
-- **自动批准**：`useEffect` 监听 `persistApprovals` 开关，新出现的待授权项立即放行（用 `Set` 去重防重复触发）。
+- **自动批准**：`useEffect` 监听 `autoApprove` 开关（调用方 `App.tsx` 持有的内存态），新出现的待授权项立即放行（用 `Set` 去重防重复触发）。
 
 ### 验证证据（`check:ui` 新增 5 项断言）
 

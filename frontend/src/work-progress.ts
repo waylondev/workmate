@@ -1,15 +1,10 @@
 // 从 AG-UI 线程消息派生「工作进度」与「对话产物」。
 //
 // 纯函数、无副作用：右侧摘要面板只负责渲染，派生逻辑集中在这里，便于单独推理与复用。
-// 类型直接取自 assistant-ui 的线程状态（`AssistantState["thread"]["messages"]`），
+// 线程消息类型统一取自 `thread-types.ts`（直接沿用 assistant-ui 的线程状态类型），
 // 不复制一份并行定义，避免与库版本漂移。
 
-import type { AssistantState } from "@assistant-ui/react"
-
-export type ThreadMessages = AssistantState["thread"]["messages"]
-
-type Part = ThreadMessages[number]["parts"][number]
-type ToolPart = Extract<Part, { type: "tool-call" }>
+import type { ThreadMessages, ThreadPart, ToolCallPart } from "@/thread-types"
 
 export type StepStatus = "done" | "running" | "failed"
 
@@ -110,23 +105,23 @@ export function toolDetail(args: unknown): string | undefined {
   return compact(first)
 }
 
-const isRunningStatus = (part: ToolPart): boolean => {
+const isRunningStatus = (part: ToolCallPart): boolean => {
   const status = part.status
   if (status.type === "running") return true
   // 等待人工审批 / 用户输入时，这一步同样没有结束
   return status.type === "requires-action"
 }
 
-const stepStatus = (part: ToolPart): StepStatus => {
+const stepStatus = (part: ToolCallPart): StepStatus => {
   if (isRunningStatus(part)) return "running"
   if (part.isError) return "failed"
   if (part.status.type === "incomplete") return "failed"
   return "done"
 }
 
-const textOf = (parts: readonly Part[]): string =>
+const textOf = (parts: readonly ThreadPart[]): string =>
   parts
-    .filter((part): part is Extract<Part, { type: "text" }> => part.type === "text")
+    .filter((part): part is Extract<ThreadPart, { type: "text" }> => part.type === "text")
     .map((part) => part.text)
     .join("")
     .trim()
@@ -144,7 +139,7 @@ export function deriveWorkSteps(messages: ThreadMessages): WorkStep[] {
     if (message.role !== "assistant") return
 
     const parts = message.parts
-    const toolParts = parts.filter((part): part is ToolPart => part.type === "tool-call")
+    const toolParts = parts.filter((part): part is ToolCallPart => part.type === "tool-call")
 
     // 有工具调用的消息，用「思考」代表其推理阶段；纯文本消息不额外造思考步骤
     if (toolParts.length > 0) {

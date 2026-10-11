@@ -109,6 +109,7 @@ workmate/
 │   ├── src/agui-errors.ts              # 运行失败归类（会话卡在待授权 → 出路）
 │   ├── src/agents.ts                   # 前端 agent 目录（含 permission 展示）
 │   ├── src/approvals.ts                # 待授权项派生（纯函数，横幅数据源）
+│   ├── src/thread-types.ts             # 线程消息共享类型（work-progress / approvals 共用）
 │   ├── src/api.ts                      # /api/* 封装（RFC 7807 → ApiError）
 │   ├── src/sessions.ts                 # 本地会话目录（localStorage）
 │   ├── src/work-progress.ts            # 右栏派生逻辑（纯函数，无独立状态）
