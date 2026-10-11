@@ -14,7 +14,14 @@ data class AgentProperties(
 	val sysPrompt: String,
 	/** agent 工作区，同时作为权限上下文的工作目录。 */
 	val workspace: Path,
-	/** `default` 时非只读工具触发 AG-UI HITL 审批；`bypass` 全部放行。 */
+	/**
+	 * 官方 [PermissionMode] 语义：
+	 * - `default`：所有操作都需显式 allow 规则（未命中即走 AG-UI `permission_confirm` 审批）
+	 * - `accept-edits`：工作目录内的编辑自动放行
+	 * - `explore`：只读，修改类工具被拒
+	 * - `bypass`：全部放行
+	 * - `dont-ask`：ASK 降级为 DENY，用于无人值守
+	 */
 	val permissionMode: PermissionMode = PermissionMode.DEFAULT,
 	val maxIters: Int = 10,
 	val maxContextTokens: Int = 8_000,

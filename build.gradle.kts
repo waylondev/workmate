@@ -22,23 +22,17 @@ repositories {
 
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-webflux")
-	implementation("org.springframework.boot:spring-boot-h2console")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("io.agentscope:agentscope-harness:$agentscopeVersion")
 	implementation("io.agentscope:agentscope-agui-spring-boot-starter:$agentscopeVersion")
 	implementation("io.agentscope:agentscope-admin-spring-boot-starter:$agentscopeVersion")
 	implementation("io.agentscope:agentscope-openai-spring-boot-starter:$agentscopeVersion")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
-	compileOnly("org.projectlombok:lombok")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
 	developmentOnly("org.springframework.boot:spring-boot-docker-compose")
-	runtimeOnly("com.h2database:h2")
-	annotationProcessor("org.projectlombok:lombok")
 	testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-	testCompileOnly("org.projectlombok:lombok")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-	testAnnotationProcessor("org.projectlombok:lombok")
 }
 
 kotlin {

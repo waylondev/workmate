@@ -31,16 +31,27 @@ agentscope:
     # 官方管控面（actuator 端点 + 审计 + 用量），默认关闭需显式开启
     enabled: true
 
-# 业务侧 agent 目录：key 即 agent id
+# 业务侧 agent 目录：key 即 agent id，同时是 AG-UI 路由段
 workmate:
   agents:
+    # 通用助手：非只读工具走 AG-UI HITL 审批
     default:
       name: Workmate
-      sys-prompt: You are Workmate, a helpful assistant.
+      sys-prompt: You are Workmate, a helpful general assistant.
       workspace: .agentscope/workspace/default
-      # default：非只读工具走 AG-UI HITL 审批；bypass：全部放行
       permission-mode: default
-      max-iters: 10
-      max-context-tokens: 8000
-      enable-plan-mode: false
-      enable-tracing-log: true
+    # 编码 agent：工作区内自动放行编辑，允许进入计划模式
+    coder:
+      name: Coder
+      sys-prompt: You are a senior software engineer. Prefer minimal, verifiable changes.
+      workspace: .agentscope/workspace/coder
+      permission-mode: accept-edits
+      enable-plan-mode: true
+      max-iters: 30
+    # 只读分析 agent：不发起任何写操作
+    explorer:
+      name: Explorer
+      sys-prompt: You are a read-only analyst. Never modify files or run mutating commands.
+      workspace: .agentscope/workspace/explorer
+      permission-mode: explore
+      max-iters: 15
