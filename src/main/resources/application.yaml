@@ -6,8 +6,9 @@ management:
   endpoints:
     web:
       exposure:
-        # 暴露 agentscope-admin 提供的管控端点（agents/permissions/usage/tools/models/...）
-        include: "health,info,agentscope-*"
+        # 只支持 "*" 或 "*后缀" 两种通配；agentscope-* 这类前缀通配会被 EndpointId 校验拒绝。
+        # 类路径上仅 health/info 与 agentscope-admin 的 agentscope-* 端点，故直接全放开。
+        include: "*"
 
 # AgentScope：仅使用官方 starter 的自动配置能力
 agentscope:
