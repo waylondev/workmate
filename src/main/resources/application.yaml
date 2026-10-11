@@ -20,10 +20,15 @@ agentscope:
     enable-reasoning: true
     emit-token-usage: true
 
-# 业务侧 harness agent 定义
+# 业务侧 harness agent 定义（未列出的能力沿用 HarnessAgent 官方默认值）
 workmate:
   agent:
-    id: default
     name: Workmate
     sys-prompt: You are Workmate, a helpful assistant.
     workspace: .agentscope/workspace
+    # default：非只读工具走 AG-UI HITL 审批；bypass：全部放行
+    permission-mode: default
+    max-iters: 10
+    max-context-tokens: 8000
+    enable-plan-mode: false
+    enable-tracing-log: true
