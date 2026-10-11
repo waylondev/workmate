@@ -33,8 +33,6 @@ class AgentConfiguration {
 				"已定义：${catalog.agents.keys}"
 		}
 
-		return AguiAgentRegistryCustomizer { registry ->
-			catalog.agents.forEach { (id, agent) -> registry.register(id, agent) }
-		}
+		return AguiAgentRegistryCustomizer { registry -> catalog.registerAll(registry) }
 	}
 }

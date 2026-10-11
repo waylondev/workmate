@@ -11,6 +11,11 @@ import java.nio.file.Path
  */
 data class AgentProperties(
 	val name: String,
+	/**
+	 * agent 简介，用于管理接口展示与子智能体目录。留空时回退为 [name]——
+	 * 不设置时 `HarnessAgent` 会生成 `Agent(<uuid>) Name` 这类无意义描述。
+	 */
+	val description: String = "",
 	val sysPrompt: String,
 	/** agent 工作区，同时作为权限上下文的工作目录。 */
 	val workspace: Path,

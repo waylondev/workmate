@@ -3,14 +3,18 @@ package org.waylon.workmate.job
 import io.agentscope.core.message.Msg
 import io.agentscope.core.model.Model
 import io.agentscope.extensions.scheduler.AgentScheduler
+import io.agentscope.extensions.scheduler.BaseScheduleAgentTask
 import io.agentscope.extensions.scheduler.ScheduleAgentTask
 import io.agentscope.extensions.scheduler.config.AgentConfig
 import io.agentscope.extensions.scheduler.config.ModelConfig
 import io.agentscope.extensions.scheduler.config.ScheduleConfig
 import io.agentscope.extensions.scheduler.quartz.QuartzAgentScheduler
-import org.waylon.workmate.agent.WorkmateProperties
+import org.quartz.CronExpression
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.waylon.workmate.agent.WorkmateProperties
+import org.waylon.workmate.web.ApiException
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 定时任务调度：复用官方 scheduler-quartz 扩展（栈无关，纯 Java，无 Spring 依赖）。
@@ -18,8 +22,7 @@ import org.springframework.context.annotation.Configuration
  * <p>官方 `agentscope-extensions-scheduler` 是聚合 POM（无 jar），实际代码在
  * `agentscope-extensions-scheduler-quartz`。核心接口 [AgentScheduler]，实现 [QuartzAgentScheduler]。
  *
- * <p>由于官方扩展无自动配置，这里手动装配成 Spring Bean。任务定义（cron + 目标 agent）持久化
- * 后续增强；当前先打通「注册 / 取消 / 列表」链路。
+ * <p>由于官方扩展无自动配置，这里手动装配成 Spring Bean。任务定义持久化属后续增强。
  */
 @Configuration(proxyBeanMethods = false)
 class JobSchedulerConfiguration {
@@ -63,6 +66,9 @@ class SharedModelConfig(
  * 实例**。因此这里复用的是「agent 的声明」（`workmate.agents.<id>` 的 sysPrompt）与应用级
  * [Model]，而不是 [org.waylon.workmate.agent.AgentCatalog] 里那个 `HarnessAgent` 实例——
  * 定时任务不享有 workspace / 记忆 / 技能 / 权限引擎。
+ *
+ * <p>**任务定义**：官方 [ScheduleAgentTask] 只保留任务名与调度配置，不记录目标 agentId，故本类
+ * 额外维护一份 `name → 定义` 映射，作为「任务列表」投影的真实来源。
  */
 class JobSchedulerService(
 	private val scheduler: AgentScheduler,
@@ -70,42 +76,101 @@ class JobSchedulerService(
 	private val properties: WorkmateProperties,
 ) {
 
+	private val definitions = ConcurrentHashMap<String, JobDefinition>()
+
 	/**
 	 * 注册一个 cron 定时任务：到点以指定 agent 的 sysPrompt 跑一次模型调用。
 	 *
 	 * @param jobName 任务名（全局唯一，用作取消标识；同时作为定时 agent 的 name）
 	 * @param agentId `workmate.agents` 中的 key，取其 sysPrompt 作为定时 agent 的人设
-	 * @param cronExpression Quartz cron 表达式（如 "0 0 8 * * ?"）
+	 * @param cronExpression Quartz cron 表达式（如 `0 0 8 * * ?`）
+	 * @throws ApiException 400 参数不合法 / 404 agent 不存在 / 409 任务名重复
 	 */
-	// 官方 Java 侧 AgentScheduler 的签名是裸类型（泛型被擦除），Kotlin 只能看到 ScheduleAgentTask<*>。
-	// 唯一实现 BaseScheduleAgentTask 声明为 implements ScheduleAgentTask<Msg>，故此处收窄是安全的。
-	@Suppress("UNCHECKED_CAST")
-	fun schedule(
-		jobName: String,
-		agentId: String,
-		cronExpression: String,
-	): ScheduleAgentTask<Msg> {
-		val declared = requireNotNull(properties.agents[agentId]) {
-			"agent not found: $agentId"
+	fun schedule(jobName: String, agentId: String, cronExpression: String): JobView {
+		val name = jobName.trim()
+		if (name.isEmpty()) throw ApiException.badRequest("job name must not be blank")
+		if (agentId.isBlank()) throw ApiException.badRequest("agentId must not be blank")
+
+		val declared = properties.agents[agentId]
+			?: throw ApiException.notFound("agent not found: $agentId")
+
+		// 先校验 cron，避免把非法表达式带进 Quartz（历史上会以未处理异常变成 500）
+		val cron = cronExpression.trim()
+		if (!CronExpression.isValidExpression(cron)) {
+			throw ApiException.badRequest("invalid Quartz cron expression: $cronExpression")
+		}
+
+		if (definitions.containsKey(name) || scheduler.getScheduledAgent(name) != null) {
+			throw ApiException.conflict("job already exists: $name")
 		}
 
 		val agentConfig = AgentConfig.builder()
-			.name(jobName)
+			.name(name)
 			.sysPrompt(declared.sysPrompt)
 			.modelConfig(SharedModelConfig(model))
 			.build()
 
 		// mode 由显式调用的方法决定：cron(...) 即 ScheduleMode.CRON
 		val scheduleConfig = ScheduleConfig.builder()
-			.cron(cronExpression)
+			.cron(cron)
 			.build()
 
-		return scheduler.schedule(agentConfig, scheduleConfig) as ScheduleAgentTask<Msg>
+		// 官方 Java 侧 AgentScheduler 的签名是裸类型（泛型被擦除），Kotlin 只能看到 ScheduleAgentTask<*>。
+		// 唯一实现 BaseScheduleAgentTask 声明为 implements ScheduleAgentTask<Msg>，故此处收窄是安全的。
+		@Suppress("UNCHECKED_CAST")
+		val task = scheduler.schedule(agentConfig, scheduleConfig) as ScheduleAgentTask<Msg>
+
+		definitions[name] = JobDefinition(agentId = agentId, cron = cron)
+
+		return JobView(
+			name = name,
+			id = task.id,
+			agentId = agentId,
+			cron = cron,
+			executions = executionCount(name),
+		)
 	}
 
-	fun cancel(jobName: String): Boolean = scheduler.cancel(jobName)
+	/** 取消任务（幂等）：不存在时返回 false，不报错。 */
+	fun cancel(jobName: String): Boolean {
+		val name = jobName.trim()
+		val cancelled = scheduler.cancel(name)
+		definitions.remove(name)
+		return cancelled
+	}
 
+	/** 列出全部任务：以本服务的定义为主，同时纳入调度器中存在但定义缺失的任务（不隐藏）。 */
 	@Suppress("UNCHECKED_CAST")
-	fun list(): List<ScheduleAgentTask<Msg>> =
-		scheduler.allScheduleAgentTasks as List<ScheduleAgentTask<Msg>>
+	fun list(): List<JobView> {
+		val tasks = scheduler.allScheduleAgentTasks
+			.associateBy { it.name }
+
+		val names = LinkedHashSet<String>().apply {
+			addAll(definitions.keys)
+			addAll(tasks.keys)
+		}
+
+		return names.map { name ->
+			val def = definitions[name]
+			val task = tasks[name]
+			val schedule = (task as? BaseScheduleAgentTask)?.scheduleConfig
+			JobView(
+				name = name,
+				id = task?.id ?: "",
+				agentId = def?.agentId ?: "",
+				cron = def?.cron ?: schedule?.cronExpression ?: "",
+				executions = executionCount(name),
+			)
+		}.sortedBy(JobView::name)
+	}
+
+	/** 已触发次数。官方仅在 [BaseScheduleAgentTask] 上暴露该计数。 */
+	private fun executionCount(jobName: String): Long =
+		(scheduler.getScheduledAgent(jobName) as? BaseScheduleAgentTask)?.executionCount ?: 0L
 }
+
+/** 任务定义（官方任务对象不保留 agentId，业务侧自留一份）。 */
+private data class JobDefinition(
+	val agentId: String,
+	val cron: String,
+)

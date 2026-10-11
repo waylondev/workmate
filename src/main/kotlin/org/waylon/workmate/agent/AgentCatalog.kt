@@ -1,5 +1,6 @@
 package org.waylon.workmate.agent
 
+import io.agentscope.core.agui.registry.AguiAgentRegistry
 import io.agentscope.core.model.Model
 import io.agentscope.core.permission.AdditionalWorkingDirectory
 import io.agentscope.core.permission.PermissionContextState
@@ -12,8 +13,9 @@ import org.springframework.beans.factory.DisposableBean
  * <p>HarnessAgent 无状态、按 `(userId, sessionId)` 隔离，可安全单例复用；集中持有是为了在容器关闭
  * 时统一 close，避免 Toolkit / WorkspaceManager / state store 泄漏。
  *
- * <p>agent 通过 [AgentConfiguration.aguiAgentRegistrar] 注册到 AG-UI 注册表（`/agui/run/{id}` 路由）。
- * 已移除对 `agentscope-admin`（MVC 运维面板）的依赖。
+ * <p>agent 通过 [registerAll] 注册到 AG-UI 注册表（`/agui/run/{id}` 路由）。注册表只有
+ * `hasAgent` / `unregister`，没有「列出」能力，因此**枚举 agent 一律以本类的 catalog 为准**，
+ * 注册态由 `registry.hasAgent(id)` 单独查询（见 `AgentAdminController`）。
  */
 class AgentCatalog(
 	model: Model,
@@ -22,6 +24,21 @@ class AgentCatalog(
 
 	val agents: Map<String, HarnessAgent> =
 		properties.agents.mapValues { (id, config) -> build(id, config, model) }
+
+	/** 把全部 agent 注册进 AG-UI 注册表（启动期调用）。 */
+	fun registerAll(registry: AguiAgentRegistry) =
+		agents.forEach { (id, agent) -> registry.register(id, agent) }
+
+	/**
+	 * 把指定 agent 注册进 AG-UI 注册表。
+	 *
+	 * @return 该 id 是否存在于 catalog
+	 */
+	fun register(registry: AguiAgentRegistry, agentId: String): Boolean {
+		val agent = agents[agentId] ?: return false
+		registry.register(agentId, agent)
+		return true
+	}
 
 	override fun destroy() = agents.values.forEach(HarnessAgent::close)
 
@@ -42,6 +59,8 @@ class AgentCatalog(
 		return HarnessAgent.builder()
 			.agentId(id)
 			.name(config.name)
+			// 必须显式给描述：官方缺省会生成 `Agent(<uuid>) Name` 这类无意义字符串
+			.description(config.description.ifBlank { config.name })
 			.sysPrompt(config.sysPrompt)
 			.model(model)
 			.workspace(workspace)
