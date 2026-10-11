@@ -32,8 +32,8 @@ class AgentConfiguration {
 	): AguiAgentRegistryCustomizer {
 		// 默认 agent 是跨命名空间的字符串指针，写错只会静默 404，故在启动期断言
 		require(catalog.agents.containsKey(agui.defaultAgentId)) {
-			"agentscope.agui.default-agent-id='${agui.defaultAgentId}' 未在 workmate.agents 中定义：" +
-				catalog.agents.keys
+			"agentscope.agui.default-agent-id='${agui.defaultAgentId}' 未在 workmate.agents 中定义，" +
+				"已定义：${catalog.agents.keys}"
 		}
 
 		return AguiAgentRegistryCustomizer { registry ->

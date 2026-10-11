@@ -43,7 +43,9 @@ class AgentCatalog(
 	private fun build(id: String, config: AgentProperties, model: Model): HarnessAgent {
 		val workspace = config.workspace.toAbsolutePath().normalize()
 
-		// 必须是非 trivial 上下文才会启用权限引擎，否则非只读工具不会被拦截
+		// 官方 isTrivial()：mode=DEFAULT 且无工作目录、无规则时退回「仅工具自检」的轻量路径，
+		// 配置的 permission-mode（即 AG-UI 的 permission_confirm 审批）将不参与判定；
+		// 登记工作目录以启用完整权限引擎，并让 ACCEPT_EDITS 能在工作区内自动放行。
 		val permission = PermissionContextState.builder()
 			.mode(config.permissionMode)
 			.addWorkingDirectory(
@@ -62,7 +64,7 @@ class AgentCatalog(
 			.maxContextTokens(config.maxContextTokens)
 			.enableAgentTracingLog(config.enableTracingLog)
 			.permissionContext(permission)
-			.apply { if (config.enablePlanMode) enablePlanMode() }
+			.enablePlanMode(config.enablePlanMode)
 			.build()
 	}
 }
