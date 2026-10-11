@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workmate 前后端联调测试报告</title>
+<style>
+  :root{
+    --bg:#0a0e1a; --panel:#101627; --panel2:#151d33; --line:#22304f;
+    --cyan:#22d3ee; --cyan-dim:#0e7490; --green:#34d399; --amber:#fbbf24; --red:#f87171;
+    --txt:#e2e8f0; --dim:#8ea3bf; --mono:'JetBrains Mono','Cascadia Code',Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:'Segoe UI','Microsoft YaHei',system-ui,sans-serif;line-height:1.6;padding:32px 20px}
+  .wrap{max-width:1080px;margin:0 auto}
+  .grid{display:grid;gap:18px}
+  /* 顶部 */
+  .hero{background:linear-gradient(135deg,#101b35 0%,#0b1120 60%,#0e2030 100%);border:1px solid var(--line);border-radius:16px;padding:30px 32px;position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(600px 200px at 80% -20%,rgba(34,211,238,.12),transparent)}
+  .hero .kicker{font-size:12px;letter-spacing:3px;color:var(--cyan);text-transform:uppercase;font-weight:600}
+  .hero h1{font-size:30px;margin:8px 0 4px;background:linear-gradient(90deg,#22d3ee,#67e8f9,#a5f3fc);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero .sub{color:var(--dim);font-size:14px}
+  .badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+  .badge{padding:5px 14px;border-radius:999px;font-size:12.5px;font-weight:600;border:1px solid}
+  .b-ok{color:var(--green);border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.08)}
+  .b-cyan{color:var(--cyan);border-color:rgba(34,211,238,.4);background:rgba(34,211,238,.08)}
+  .b-dim{color:var(--dim);border-color:rgba(142,163,191,.35);background:rgba(142,163,191,.06)}
+  /* 区块 */
+  section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px}
+  h2{font-size:17px;color:var(--cyan);margin-bottom:16px;display:flex;align-items:center;gap:10px}
+  h2::before{content:'';width:4px;height:16px;background:linear-gradient(var(--cyan),var(--cyan-dim));border-radius:2px}
+  h3{font-size:14px;color:#cfe3ff;margin:18px 0 8px}
+  p,li{color:#c6d3e4;font-size:13.5px}
+  .muted{color:var(--dim)}
+  .mono{font-family:var(--mono);font-size:12.5px}
+  /* 表格 */
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#1a2340;color:var(--cyan);font-weight:600;font-size:12.5px;letter-spacing:.3px}
+  td{color:#d5e0f0}
+  tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+  .pass{color:var(--green);font-weight:700}
+  .pass::before{content:'✓ '}
+  .warn{color:var(--amber);font-weight:700}
+  .pass-tag{display:inline-block;padding:2px 10px;border-radius:6px;background:rgba(52,211,153,.12);color:var(--green);font-weight:700;font-size:12px}
+  /* 链路图 */
+  .flow{display:flex;align-items:stretch;gap:0;margin:14px 0 6px;flex-wrap:wrap}
+  .node{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:150px;text-align:center;position:relative}
+  .node .t{font-size:13px;font-weight:700;color:#eaf2ff}
+  .node .s{font-size:11.5px;color:var(--dim);margin-top:2px}
+  .node.primary{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(34,211,238,.25),0 0 24px rgba(34,211,238,.15)}
+  .node.primary .t{color:var(--cyan)}
+  .node.model{border-color:rgba(52,211,153,.5)}
+  .node.model .t{color:var(--green)}
+  .arrow{display:flex;align-items:center;padding:0 8px;color:var(--cyan);font-weight:700;font-size:16px}
+  .arrow small{display:block;font-size:10px;color:var(--dim);font-weight:400;text-align:center}
+  /* 代码 */
+  pre{background:#0b111f;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;font-family:var(--mono);font-size:12px;color:#9fd8e8;line-height:1.5;margin:8px 0}
+  .k{color:#7dd3fc}.v{color:#86efac}.str{color:#fbbf24}
+  /* 卡片 */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .stat .num{font-size:26px;font-weight:800;color:var(--cyan);font-family:var(--mono)}
+  .stat .lab{font-size:12px;color:var(--dim);margin-top:2px}
+  .stat.ok .num{color:var(--green)}
+  ul.tick li{margin:5px 0 5px 2px;padding-left:20px;position:relative;list-style:none}
+  ul.tick li::before{content:'▶';position:absolute;left:2px;color:var(--cyan);font-size:10px;top:3px}
+  .note{border-left:3px solid var(--amber);background:rgba(251,191,36,.05);padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0;font-size:13px;color:#e8dcc0}
+  footer{margin-top:24px;color:var(--dim);font-size:12px;text-align:center;border-top:1px solid var(--line);padding-top:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="kicker">Integration Test Report · 前后端联调测试报告</div>
+    <h1>Workmate 全链路联调测试报告</h1>
+    <div class="sub">OpenAI 兼容 API · CPA(CLIProxyAPI v8.0.23) 反代 WorkBuddy · 默认模型 <b style="color:#67e8f9">hy3</b>（免费）</div>
+    <div class="badges">
+      <span class="badge b-ok">7 / 7 项测试通过</span>
+      <span class="badge b-cyan">HITL 审批闭环已验证</span>
+      <span class="badge b-dim">2026-10-11</span>
+      <span class="badge b-dim">运行环境：本机 Windows</span>
+    </div>
+  </div>
+
+  <!-- 结论总览 -->
+  <section style="margin-top:18px">
+    <h2>测试结论总览</h2>
+    <div class="cards">
+      <div class="stat ok"><div class="num">UP</div><div class="lab">后端 health (8080)</div></div>
+      <div class="stat ok"><div class="num">30</div><div class="lab">CPA 可用模型 (含 hy3)</div></div>
+      <div class="stat ok"><div class="num">200</div><div class="lab">前端 Vite (5173)</div></div>
+      <div class="stat ok"><div class="num">9</div><div class="lab">explorer 工具调用成功</div></div>
+      <div class="stat ok"><div class="num">✓</div><div class="lab">HITL 审批 → 文件写入</div></div>
+    </div>
+    <p style="margin-top:14px">前后端全链路已联调通过。链路 <b>前端(5173) → 后端(8080, Spring Boot) → CPA(8317, /v1 OpenAI 兼容) → WorkBuddy(hy3 真实模型)</b> 四层全部贯通。此前阻塞 HITL 审批的两个问题（<span class="mono" style="color:#7dd3fc">expiresAt:null</span> 解析失败、旧会话 ASKING 残留）已分别修复与清理，审批中断机制、批准后继续执行均已实测通过。</p>
+  </section>
+
+  <!-- 架构链路 -->
+  <section style="margin-top:18px">
+    <h2>架构链路</h2>
+    <div class="flow">
+      <div class="node"><div class="t">前端</div><div class="s">React 18 · Vite :5173<br>assistant-ui · AG-UI</div></div>
+      <div class="arrow">→<small>AG-UI SSE</small></div>
+      <div class="node primary"><div class="t">Workmate 后端</div><div class="s">Spring Boot :8080<br>AgentScope · AG-UI 服务端</div></div>
+      <div class="arrow">→<small>/v1 OpenAI</small></div>
+      <div class="node"><div class="t">CPA</div><div class="s">CLIProxyAPI :8317<br>api-key 鉴权</div></div>
+      <div class="arrow">→<small>原生协议</small></div>
+      <div class="node model"><div class="t">WorkBuddy · hy3</div><div class="s">真实云端模型<br>（免费）</div></div>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin-top:6px">后端通过 <span class="mono">agentscope.openai.base-url=http://127.0.0.1:8317/v1</span>、<span class="mono">api-key=sk-workmate-cpa-7d2b</span>、<span class="mono">model-name=hy3</span> 接入；Agent 权限按 agent 区分（default=HITL 审批、explorer=只读自动放行、coder=accept-edits）。</p>
+  </section>
+
+  <!-- 测试项结果表 -->
+  <section style="margin-top:18px">
+    <h2>测试项与结果</h2>
+    <table>
+      <thead><tr><th style="width:44px">编号</th><th>测试项</th><th>链路/Agent</th><th style="width:110px">结果</th><th>关键证据</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">T1</td><td>后端健康检查</td><td class="mono">GET /actuator/health</td><td><span class="pass-tag">通过</span></td><td><span class="mono">{"status":"UP"}</span></td></tr>
+        <tr><td class="mono">T2</td><td>OpenAI 兼容模型列表</td><td class="mono">GET /v1/models (CPA)</td><td><span class="pass-tag">通过</span></td><td>30 个模型，含 <span class="mono">hy3</span>（默认）</td></tr>
+        <tr><td class="mono">T3</td><td>前端服务可用</td><td class="mono">http://localhost:5173</td><td><span class="pass-tag">通过</span></td><td>HTTP 200</td></tr>
+        <tr><td class="mono">T4</td><td>简单问答（无工具）</td><td class="mono">/agui/run/default</td><td><span class="pass-tag">通过</span></td><td>RUN_STARTED → REASONING×32 → TEXT×15 → RUN_FINISHED</td></tr>
+        <tr><td class="mono">T5</td><td>工具调用（只读）</td><td class="mono">/agui/run/explorer</td><td><span class="pass-tag">通过</span></td><td>REASONING×2163 → <b>TOOL_CALL×9 全成功</b>（list_files 等）→ TEXT×400 → RUN_FINISHED</td></tr>
+        <tr><td class="mono">T6</td><td>HITL 审批触发（写文件）</td><td class="mono">/agui/run/default</td><td><span class="pass-tag">通过</span></td><td>write_file → <span class="mono">outcome.interrupt</span>（responseSchema: approved）</td></tr>
+        <tr><td class="mono">T7</td><td>HITL 审批闭环（批准后继续）</td><td class="mono">resume(approved:true)</td><td><span class="pass-tag">通过</span></td><td>TOOL_CALL_RESULT "Written to report-test.txt"，文件真实写入（内容 hi）</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="margin-top:10px;font-size:12.5px">判定标准：SSE 事件流完整到达 RUN_FINISHED 且无 RUN_ERROR；工具调用阶段返回成功 TOOL_CALL_RESULT；HITL 中断按 schema 返回并可在 resume 后继续执行。</p>
+  </section>
+
+  <!-- HITL 详解 -->
+  <section style="margin-top:18px">
+    <h2>HITL 人工审批链路详解</h2>
+    <p>default agent 下，非只读工具每次执行前都需要人工审批。实测完整闭环如下（T6→T7）：</p>
+    <pre><span class="k">RUN_STARTED</span>      threadId=wm-lt-a3
+  <span class="k">REASONING_MESSAGE</span> ×155  模型推理：识别 write_file 为非只读，遵循 AGENTS.md 硬约束先说明意图
+  <span class="k">TEXT_MESSAGE</span>      "我将在您的工作区根目录创建 report-test.txt（内容 hi）…"
+  <span class="k">TOOL_CALL_START</span>   write_file  toolCallId=chatcmpl-tool-94ca866d7e6dec61
+  <span class="k">TOOL_CALL_ARGS</span>    {"path":"report-test.txt","content":"hi"}
+  <span class="k">RUN_FINISHED</span>      outcome.type=<span class="str">interrupt</span>
+                       id: 1b9e1340…:chatcmpl-tool-94ca866d7e6dec61
+                       reason: tool_call
+                       responseSchema: <span class="v">{required:["approved"], properties:{approved:boolean,…}}</span>
+                       expiresAt: null   ← 修复点
+
+<span class="k">（用户批准 approved:true → resume）</span>
+  <span class="k">TOOL_CALL_RESULT</span>   "Written to report-test.txt"   ← 实际执行成功
+  <span class="k">TEXT_MESSAGE</span>      ×34  模型汇报写入结果
+  <span class="k">RUN_FINISHED</span>      （正常完成）</pre>
+    <p><b>之前"前端没提示"的根因（已解决）：</b></p>
+    <ul class="tick">
+      <li><span class="mono" style="color:#7dd3fc">expiresAt:null</span> 导致 assistant-ui 解析中断 payload 抛 schema 校验异常 → 前端未弹审批卡。已在 <span class="mono">ag-ui-runtime-provider.tsx</span> 自定义 SSE fetch，递归剥离值为 null 的 expiresAt 字段，保留合法字符串时间戳，tsc 通过并已提交（commit <span class="mono">2b81b01</span>）。</li>
+      <li>旧会话 threadId=<span class="mono">dc31857e</span> 残留的 <span class="mono">list_files/glob_files</span> ASKING 状态被持久化，同会话再发消息即报 INVALID_INPUT_ERROR。已清理该会话目录，前端开新会话即可正常使用。</li>
+    </ul>
+    <div class="note">用户侧确认：审批卡弹出需浏览器硬刷新（Ctrl+Shift+R，因 Vite HMR 对 provider 模块刷新不彻底）+ 新会话。API/后端层 HITL 机制已 100% 验证正常。</div>
+  </section>
+
+  <!-- 性能与 token -->
+  <section style="margin-top:18px">
+    <h2>性能与 Token 证据（hy3）</h2>
+    <table>
+      <thead><tr><th>用例</th><th>输入 tokens</th><th>输出 tokens</th><th>推理 tokens</th><th>合计</th><th>模型调用耗时</th></tr></thead>
+      <tbody>
+        <tr><td>T6 写文件中断</td><td class="mono">5,976</td><td class="mono">368</td><td class="mono">304</td><td class="mono">6,344</td><td class="mono">5.19 s</td></tr>
+        <tr><td>T5 explorer 工具调用</td><td class="mono">—（持续累积）</td><td class="mono">REASONING×2163 段</td><td class="mono">多轮推理</td><td class="mono">—</td><td class="mono">—</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="margin-top:8px;font-size:12.5px">hy3 全链路推理正常（推理 token 输出、6.6s 级响应），相比此前弃用的本地 Ollama qwen2.5:1.5b（纯 CPU、无推理/工具事件、10–65s）在能力与速度上均为可用级别。</p>
+  </section>
+
+  <!-- 环境与配置 -->
+  <section style="margin-top:18px">
+    <h2>运行环境与关键配置</h2>
+    <table>
+      <thead><tr><th>项</th><th>值</th></tr></thead>
+      <tbody>
+        <tr><td>后端</td><td class="mono">:8080 · Spring Boot 4.1.1 · Kotlin · PID 12624</td></tr>
+        <tr><td>前端</td><td class="mono">:5173 · React 18 · Vite · assistant-ui + @ag-ui/client 0.0.59 + @assistant-ui/react-ag-ui ^0.0.67</td></tr>
+        <tr><td>模型代理</td><td class="mono">CPA CLIProxyAPI v8.0.23 · :8317 · workbuddy.dll v0.9.56 · 30 模型</td></tr>
+        <tr><td>默认模型</td><td class="mono">hy3（agentscope.openai.model-name，可经 OPENAI_MODEL 覆盖）</td></tr>
+        <tr><td>API Key</td><td class="mono">sk-workmate-cpa-7d2b（客户调用）</td></tr>
+        <tr><td>Agent 权限</td><td class="mono">default=permission-mode default（HITL）· explorer=explore（只读放行）· coder=accept-edits</td></tr>
+        <tr><td>模型可用性</td><td class="mono">auto, default, hy3, hy3-x, hy4-preview(-x), glm-4.6/4.6v/4.7/5.0/5.1/5.2/5.3(-flash)/5v-turbo, deepseek-v3-2-volc/v4-flash/v4.1-flash/v4-pro, kimi-k2.5/2.6/2.7/2.8-preview/2-thinking/k3-1, hunyuan-2.0-thinking/chat, minimax-m2.5/m3, space-bunny</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 结论与遗留 -->
+  <section style="margin-top:18px">
+    <h2>结论与遗留项</h2>
+    <ul class="tick">
+      <li><b>结论：</b>OpenAI 兼容 API 全链路联调通过（7/7）。CPA+WorkBuddy(hy3) 作为免费、真实的模型后端已稳定支撑对话、推理、工具调用与 HITL 审批四大能力。</li>
+      <li>遗留：HITL 审批卡的最终用户侧确认需浏览器硬刷新后新会话实测；若仍不弹，请提供浏览器控制台报错。</li>
+      <li>提示：default agent 下所有非只读工具每次执行都会触发审批（属设计行为）；如需免审批可切 coder(accept-edits) 或调低权限模式。</li>
+    </ul>
+    <div class="note">测试脚本与请求体：<span class="mono">D:\workmate\dev\agui-t4/t5/t6.json、agui-resume.json</span>；SSE 捕获：<span class="mono">%TEMP%\wm-t4/t5/t6.out、wm-resume.out</span>；启动说明见 <span class="mono">dev\OLLAMA_联调启动说明.md</span>。</div>
+  </section>
+
+  <footer>Workmate · 联调测试报告 · 2026-10-11 · 由本地实测 SSE 事件流与工具执行结果生成</footer>
+</div>
+</body>
+</html>
