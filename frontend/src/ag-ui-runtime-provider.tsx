@@ -28,12 +28,16 @@ export function useApprovalRuntime(): ApprovalRuntime | null {
 }
 
 /**
- * `ThreadRuntimeImpl.__internal_threadBinding` 中与审批相关的收窄类型。
- * 这是库未在公共接口暴露、但运行时确实具备的能力。
+ * `ThreadRuntimeImpl.__internal_threadBinding` 的收窄类型。
+ *
+ * <p>审批方法不在 binding 顶层，而在 `getState()` 返回的 ThreadMethods 里
+ * （由 `useExternalStoreRuntime` 按 `onRespondToToolApproval` 是否注册动态装配）。
  */
 type ThreadBinding = {
-  __internal_threadBinding?: {
-    respondToToolApproval: ApprovalRuntime["respondToToolApproval"]
+  __internal_threadBinding: {
+    getState: () => {
+      respondToToolApproval?: ApprovalRuntime["respondToToolApproval"]
+    }
   }
 }
 
@@ -76,21 +80,25 @@ export function AgUiRuntimeProvider({
 
   const runtime = useAgUiRuntime({ agent, onError })
 
-  const approvalRuntime = useMemo<ApprovalRuntime>(() => {
-    const binding = (runtime.thread as unknown as ThreadBinding)
-      .__internal_threadBinding
-    return {
+  const approvalRuntime = useMemo<ApprovalRuntime>(
+    () => ({
       respondToToolApproval: (options) => {
-        const responder = binding?.respondToToolApproval
-        if (!responder) {
+        // 方法在 binding.getState()（即 runtime core 本体）上；必须以
+        // `methods.xxx(...)` 形式调用保住 this——摘下来调用会丢失
+        // core 实例（内部 `this._store` 变 undefined）。
+        const methods = (
+          runtime.thread as unknown as ThreadBinding
+        ).__internal_threadBinding.getState()
+        if (!methods.respondToToolApproval) {
           throw new Error(
             "respondToToolApproval 不可用：审批能力未接入运行时",
           )
         }
-        return responder(options)
+        return methods.respondToToolApproval(options)
       },
-    }
-  }, [runtime])
+    }),
+    [runtime],
+  )
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
