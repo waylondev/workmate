@@ -26,6 +26,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("io.agentscope:agentscope-harness:$agentscopeVersion")
 	implementation("io.agentscope:agentscope-agui-spring-boot-starter:$agentscopeVersion")
+	implementation("io.agentscope:agentscope-admin-spring-boot-starter:$agentscopeVersion")
 	implementation("io.agentscope:agentscope-openai-spring-boot-starter:$agentscopeVersion")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	compileOnly("org.projectlombok:lombok")

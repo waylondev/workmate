@@ -2,9 +2,16 @@ spring:
   application:
     name: workmate
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # 暴露 agentscope-admin 提供的管控端点（agents/permissions/usage/tools/models/...）
+        include: "health,info,agentscope-*"
+
 # AgentScope：仅使用官方 starter 的自动配置能力
 agentscope:
-  # 关闭官方默认 ReActAgent，改由 HarnessAgent 作为唯一 agent
+  # 关闭官方默认 ReActAgent，agent 统一由 workmate.agents 声明
   agent:
     enabled: false
   model:
@@ -16,19 +23,24 @@ agentscope:
     stream: true
   agui:
     path-prefix: /agui
+    # 必须是 workmate.agents 中的某个 key
     default-agent-id: default
     enable-reasoning: true
     emit-token-usage: true
+  admin:
+    # 官方管控面（actuator 端点 + 审计 + 用量），默认关闭需显式开启
+    enabled: true
 
-# 业务侧 harness agent 定义（未列出的能力沿用 HarnessAgent 官方默认值）
+# 业务侧 agent 目录：key 即 agent id
 workmate:
-  agent:
-    name: Workmate
-    sys-prompt: You are Workmate, a helpful assistant.
-    workspace: .agentscope/workspace
-    # default：非只读工具走 AG-UI HITL 审批；bypass：全部放行
-    permission-mode: default
-    max-iters: 10
-    max-context-tokens: 8000
-    enable-plan-mode: false
-    enable-tracing-log: true
+  agents:
+    default:
+      name: Workmate
+      sys-prompt: You are Workmate, a helpful assistant.
+      workspace: .agentscope/workspace/default
+      # default：非只读工具走 AG-UI HITL 审批；bypass：全部放行
+      permission-mode: default
+      max-iters: 10
+      max-context-tokens: 8000
+      enable-plan-mode: false
+      enable-tracing-log: true

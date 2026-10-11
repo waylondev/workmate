@@ -1,51 +1,43 @@
 package org.waylon.workmate.agent
 
 import io.agentscope.core.model.Model
-import io.agentscope.core.permission.AdditionalWorkingDirectory
-import io.agentscope.core.permission.PermissionContextState
-import io.agentscope.harness.agent.HarnessAgent
-import io.agentscope.spring.boot.agui.common.AguiAgentId
+import io.agentscope.spring.boot.admin.registry.AgentRegistry
+import io.agentscope.spring.boot.agui.common.AguiAgentRegistryCustomizer
+import io.agentscope.spring.boot.agui.common.AguiProperties
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 /**
- * HarnessAgent 装配。
+ * Agent 装配。
  *
- * <p>[Model] 由官方 OpenAI starter 自动配置提供，AG-UI 注册表与 `/agui/run` 端点由
- * agentscope-agui-spring-boot-starter 自动装配；本类只声明 agent 本体与权限上下文。
+ * <p>[Model] 由官方 OpenAI starter 自动配置提供；`/agui/run/{agentId}` 路由与注册表由
+ * agentscope-agui-spring-boot-starter 自动装配。本类只负责把配置中的 agent 交给官方注册表，
+ * 因为 agent 由 [AgentCatalog] 持有而非 Spring bean（prototype 语义下官方不会自动纳管）。
  */
 @Configuration(proxyBeanMethods = false)
 class AgentConfiguration {
 
 	@Bean
-	@AguiAgentId(AGENT_ID)
-	fun harnessAgent(model: Model, props: AgentProperties): HarnessAgent {
-		val workspace = props.workspace.toAbsolutePath().normalize()
+	fun agentCatalog(
+		model: Model,
+		properties: WorkmateProperties,
+		adminRegistry: ObjectProvider<AgentRegistry>,
+	) = AgentCatalog(model, properties, adminRegistry)
 
-		// 必须是非 trivial 上下文才会启用权限引擎，否则非只读工具不会被拦截
-		val permission = PermissionContextState.builder()
-			.mode(props.permissionMode)
-			.addWorkingDirectory(
-				"workspace",
-				AdditionalWorkingDirectory(workspace.toString(), "userSettings"),
-			)
-			.build()
+	@Bean
+	fun aguiAgentRegistrar(
+		catalog: AgentCatalog,
+		agui: AguiProperties,
+	): AguiAgentRegistryCustomizer {
+		// 默认 agent 是跨命名空间的字符串指针，写错只会静默 404，故在启动期断言
+		require(catalog.agents.containsKey(agui.defaultAgentId)) {
+			"agentscope.agui.default-agent-id='${agui.defaultAgentId}' 未在 workmate.agents 中定义：" +
+				catalog.agents.keys
+		}
 
-		return HarnessAgent.builder()
-			.name(props.name)
-			.sysPrompt(props.sysPrompt)
-			.model(model)
-			.workspace(workspace)
-			.maxIters(props.maxIters)
-			.maxContextTokens(props.maxContextTokens)
-			.enableAgentTracingLog(props.enableTracingLog)
-			.permissionContext(permission)
-			.apply { if (props.enablePlanMode) enablePlanMode() }
-			.build()
-	}
-
-	companion object {
-		/** 需与 `agentscope.agui.default-agent-id` 保持一致。 */
-		const val AGENT_ID = "default"
+		return AguiAgentRegistryCustomizer { registry ->
+			catalog.agents.forEach { (id, agent) -> registry.register(id, agent) }
+		}
 	}
 }
