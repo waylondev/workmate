@@ -34,6 +34,7 @@ AgentScope 相关依赖（`io.agentscope:2.0.4`）：
 | `agentscope-harness` | `HarnessAgent` 核心，内置记忆、上下文压缩、transcript、技能、子智能体、内置工具 |
 | `agentscope-agui-spring-boot-starter` | AG-UI 端点与 Agent 注册表自动配置（WebFlux / MVC 双栈，本项目走 WebFlux） |
 | `agentscope-openai-spring-boot-starter` | OpenAI 兼容模型接入，自动配置 `Model` |
+| `agentscope-extensions-scheduler-common` | 定时任务公共 API（`AgentScheduler` / `BaseScheduleAgentTask` / `AgentConfig`） |
 | `agentscope-extensions-scheduler-quartz` | 定时任务（官方 Quartz 扩展，本项目 `job/` 薄层建在它上面） |
 
 > **不使用 `agentscope-admin-spring-boot-starter`**：它是 MVC（Servlet）栈，与本项目 WebFlux 冲突，且只提供运维观测而非业务 CRUD。因此 `/actuator` 下**不存在** `agentscope-*` 端点，管理能力由本项目 `/api/*` 提供。
@@ -101,7 +102,10 @@ workmate/
 │   ├── job/
 │   │   ├── JobSchedulerConfiguration.kt # Quartz 调度 Bean（官方扩展）+ JobSchedulerService
 │   │   ├── JobDefinitionStore.kt        # 任务定义落盘（.agentscope/jobs.json，重启恢复）
-│   │   └── JobController.kt            # /api/jobs：创建 / 列表 / 取消
+│   │   ├── ExecutionRecordingHook.kt    # 官方 Hook：捕获每次触发的输出/token/状态
+│   │   ├── JobExecution.kt              # 执行记录 data class
+│   │   ├── JobExecutionStore.kt         # 执行历史落盘（.agentscope/job-executions.json，每任务 50 条）
+│   │   └── JobController.kt            # /api/jobs：创建 / 列表 / 取消 / 执行历史
 │   └── web/
 │       ├── ApiException.kt             # 业务异常 → HTTP 状态码
 │       └── ApiExceptionHandler.kt      # 统一 RFC 7807 ProblemDetail 错误体
@@ -138,8 +142,8 @@ workmate/
 ├── docs/design.md                      # 功能设计（为什么这么设计）
 ├── docs/api.md                         # API 契约（REST + AG-UI）
 ├── docs/adr/                           # 技术决策记录（ADR）
-├── docs/verification-report.md         # 联调验证报告
-├── docs/frontend-enhancement-report.md # 前端功能增强验证报告
+├── docs/ui-guidelines.md               # 前端视觉 / 交互规范（唯一权威）
+├── docs/code-review-report.md          # 代码审查报告
 └── build.gradle.kts
 ```
 
@@ -283,6 +287,7 @@ RUN_STARTED → REASONING_MESSAGE_* → TOOL_CALL_START → TOOL_CALL_ARGS ×3 �
 | GET | `/api/jobs` | 定时任务列表（含 `id` / `agentId` / `cron` / `executions`） |
 | POST | `/api/jobs` | 创建任务（`name` / `agentId` / `cronExpression`），成功返回 201 |
 | DELETE | `/api/jobs/{name}` | 取消任务（幂等） |
+| GET | `/api/jobs/{name}/executions` | 该任务的执行历史（最近 50 条：起止时间 / 状态 / 输出 / token） |
 
 所有错误统一为 RFC 7807 `ProblemDetail`（含 `detail` 与 `instance`），前端 `ApiError` 直接展示 `detail`。详见 `docs/design.md`。
 

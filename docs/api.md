@@ -66,6 +66,7 @@
 | GET | `/api/jobs` | 列表（`id` / `agentId` / `cron` / `executions`） | 200 |
 | POST | `/api/jobs` | 创建（`name` / `agentId` / `cronExpression`） | 201 |
 | DELETE | `/api/jobs/{name}` | 取消（幂等，`cancelled=false` 表示本不存在） | 200 |
+| GET | `/api/jobs/{name}/executions` | 执行历史（最近 50 条，新的在前：`startedAt` / `finishedAt` / `status` / `output` / `inputTokens` / `outputTokens` / `error`） | 200 |
 
 ## 端点状态字段语义
 
