@@ -32,13 +32,32 @@ agentscope:
 # 业务侧 agent 目录：key 即 agent id，同时是 AG-UI 路由段
 workmate:
   agents:
-    # 通用助手：非只读工具走 AG-UI HITL 审批
+    # 通用助手：非只读工具走 AG-UI HITL 审批；开启技能自管理 + 策展（经验可沉淀为技能）
     default:
       name: Workmate
       description: 通用助手，非只读操作会请求你的审批
       sys-prompt: You are Workmate, a helpful general assistant.
       workspace: .agentscope/workspace/default
       permission-mode: default
+      enable-skill-manage-tool: true
+      enable-skill-curator: true
+      # MCP「连接器」：声明式接入外部 MCP server（官方 ToolsConfig.mcpServers，per-agent 独立）。
+      # 取消注释并按需填写即生效；连接器以 MCP 标准协议接入任意外部服务（数据库/API/文件/云服务）。
+      # 三种 transport（三选一）：
+      #   stdio          —— command + args（本地子进程，如 npx some-mcp-server）
+      #   sse            —— url（远程，需 headers 带 token）
+      #   streamableHttp —— url（远程）
+      # tools-config:
+      #   mcp-servers:
+      #     filesystem:                 # stdio 示例：本地文件 MCP
+      #       transport: stdio
+      #       command: npx
+      #       args: ["-y", "@modelcontextprotocol/server-filesystem", "."]
+      #     remote-api:                 # streamableHttp 示例：远程服务
+      #       transport: streamableHttp
+      #       url: http://127.0.0.1:9000/mcp
+      #       headers:
+      #         authorization: "Bearer ${MCP_TOKEN:}"
     # 编码 agent：工作区内自动放行编辑，允许进入计划模式
     coder:
       name: Coder

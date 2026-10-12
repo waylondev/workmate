@@ -6,6 +6,9 @@ import io.agentscope.core.permission.AdditionalWorkingDirectory
 import io.agentscope.core.permission.PermissionMode
 import io.agentscope.core.permission.PermissionContextState
 import io.agentscope.harness.agent.HarnessAgent
+import io.agentscope.harness.agent.skill.curator.SkillCuratorConfig
+import io.agentscope.harness.agent.tool.SkillManageConfig
+import io.agentscope.harness.agent.tools.ToolsConfig
 import org.springframework.beans.factory.DisposableBean
 
 /**
@@ -74,6 +77,41 @@ class AgentCatalog(
 			.enableAgentTracingLog(config.enableTracingLog)
 			.permissionContext(permission)
 			.enablePlanMode(config.enablePlanMode)
+			.apply {
+				configureSkills(config)
+				configureTools(config)
+			}
 			.build()
+	}
+
+	/**
+	 * 按配置接入官方 Skill 生命周期能力（自建技能 + 策展）。
+	 *
+	 * <p>官方 `HarnessAgent$Builder` 在调用这两个开关后会**自动装配**整条链路
+	 * （`SkillManageTool` / `ProposeSkillTool` / `SkillUsageMiddleware` / `SkillPromoter` /
+	 * `SkillCurator` / `SkillCuratorMiddleware`），我们只负责传官方 `defaults()`，
+	 * **不覆盖任何字段、不手动 new 任何组件**。
+	 */
+	private fun HarnessAgent.Builder.configureSkills(config: AgentProperties) {
+		if (config.enableSkillManageTool) {
+			enableSkillManageTool(SkillManageConfig.defaults())
+		}
+		if (config.enableSkillCurator) {
+			enableSkillCurator(SkillCuratorConfig.defaults())
+		}
+	}
+
+	/**
+	 * 按配置接入官方 MCP「连接器」（声明式 `ToolsConfig.mcpServers`）。
+	 *
+	 * <p>官方 `HarnessAgent$Builder.toolsConfig(...)` 接收 [ToolsConfig]，其中 `mcpServers` 是
+	 * `Map<String, McpServerConfig>`。交给官方后，`McpServerRegistrar` 会按每个 config 的
+	 * `transport`（stdio/sse/streamableHttp）**自动构建 `McpClientBuilder` + `buildSync()` +
+	 * 注册进该 agent 的 `ownedMcpToolkit`**，无需手动 new 任何组件。
+	 *
+	 * <p>MCP 是 per-agent 的，多个 agent 各配各的、互不共享。
+	 */
+	private fun HarnessAgent.Builder.configureTools(config: AgentProperties) {
+		config.toolsConfig?.let { toolsConfig(it) }
 	}
 }

@@ -36,6 +36,9 @@
 | 权限引擎 | `io.agentscope.core.permission.PermissionContextState` + `AdditionalWorkingDirectory` | 必须登记工作目录，否则权限引擎退回「仅工具自检」轻量路径 |
 | 技能仓库 | `io.agentscope.core.skill.repository.AgentSkillRepository`（`allSkills` / `skillExists` / `delete` / `isWriteable` / `setWriteable` / `source` / `repositoryInfo`） | 技能列表与删除 |
 | 工作区技能仓库 | `io.agentscope.harness.agent.skill.WorkspaceSkillRepository` | 归档语义删除（移到 `skills/.archive/`） |
+| 技能自管理 | `HarnessAgent$Builder.enableSkillManageTool(SkillManageConfig)` | 开启后官方自动装配 `SkillManageTool` / `ProposeSkillTool` / `SkillUsageMiddleware` / `SkillPromoter` / `SkillAuditLog` |
+| 技能策展 | `HarnessAgent$Builder.enableSkillCurator(SkillCuratorConfig)` | 开启后官方自动装配 `SkillCurator` / `SkillCuratorMiddleware`，按 `intervalHours` 做生命周期迁移 |
+| 工具/MCP 连接器 | `HarnessAgent$Builder.toolsConfig(ToolsConfig)` | `ToolsConfig.mcpServers: Map<String,McpServerConfig>` 声明式接入 MCP server；`McpServerRegistrar` 按 transport 自动 `McpClientBuilder.buildSync()` + 注册 |
 | 调度器 | `io.agentscope.extensions.scheduler.quartz.QuartzAgentScheduler` + `AgentScheduler` / `BaseScheduleAgentTask` | 定时任务 |
 | 调度配置 | `ScheduleConfig.builder().cron(...)`、`AgentConfig.builder().name/sysPrompt/modelConfig` | `JobSchedulerService` |
 | 会话持久化 | `SessionTree` → `{threadId}/agents/{AgentName}/sessions/{threadId}.jsonl` + `.log.jsonl`，另有 `sessions.json` 索引 | 会话内容的**真相来源** |
@@ -216,6 +219,23 @@ hidden: false                              # 可选
 |---|---|
 | `GET /api/agents/{id}/skills` | 按技能名去重聚合全部来源仓库，每项带 `repositories[]`（`source` / `type` / `location` / `writable` / `archivedOnDelete`）与 `deletable` |
 | `DELETE /api/agents/{id}/skills/{name}` | 技能不存在 → 404；仓库全只读 → 409 |
+
+### 3.3.1 技能自管理 + 策展（agent 沉淀经验）
+
+官方 `HarnessAgent$Builder` 提供两个总开关，把「agent 把经验沉淀成技能」的整条生命周期接进来（**本项目只传官方 `defaults()`，不覆盖任何字段、不手动 new 组件**）：
+
+| 开关 | 官方自动装配 | 官方默认值（反编译确证） |
+|---|---|---|
+| `enableSkillManageTool(SkillManageConfig)` | `SkillManageTool` + `ProposeSkillTool` + `SkillUsageMiddleware` + `SkillPromoter` + `SkillAuditLog` | `mainDir="skills"`、`draftsDir="skills/_drafts"`、`autoPromote=false`、`securityScan=false` |
+| `enableSkillCurator(SkillCuratorConfig)` | `SkillCurator` + `SkillCuratorMiddleware` | `enabled=true`、`intervalHours=168`、`staleAfterDays=30`、`archiveAfterDays=90`、`umbrellaPassMode=DRY_RUN_ONLY` |
+
+对应配置项：`workmate.agents.<id>.enable-skill-manage-tool` / `enable-skill-curator`（布尔，默认关闭）。
+
+**边界（必须知道）**：
+
+- 官方 `autoPromote=false`：即使开了 manage tool，agent 创建的是**草稿**（落 `skills/_drafts`），不会自动转正；转正需 `promotionGate` 审批（官方 `enableSkillPromotionGate`，本项目**未接**，故草稿保持草稿态）。
+- 官方 curator `umbrellaPassMode=DRY_RUN_ONLY`：策展默认**只演练出报告**，不实际 stale/archive，需显式改 mode 才真正迁移。
+- 本项目的 `GET /api/agents/{id}/skills` 列出的是 `skills/` 主目录下的正式技能；草稿在 `skills/_drafts`，不在该列表内（如需暴露草稿，属新增功能，需单独定夺）。
 
 ### 3.4 定时任务
 

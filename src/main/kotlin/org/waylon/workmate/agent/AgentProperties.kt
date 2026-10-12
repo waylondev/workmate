@@ -1,6 +1,7 @@
 package org.waylon.workmate.agent
 
 import io.agentscope.core.permission.PermissionMode
+import io.agentscope.harness.agent.tools.ToolsConfig
 import java.nio.file.Path
 
 /**
@@ -32,4 +33,30 @@ data class AgentProperties(
 	val maxContextTokens: Int = 8_000,
 	val enablePlanMode: Boolean = false,
 	val enableTracingLog: Boolean = true,
+	/**
+	 * 是否开启「技能自管理」：agent 可创建技能草稿、晋升为正式技能。
+	 * 对应官方 `HarnessAgent$Builder.enableSkillManageTool(SkillManageConfig)`，采用官方 `defaults()`，
+	 * **不覆盖任何字段**——即 `autoPromote=false`（草稿需 promotionGate 审批才转正）、
+	 * `securityScan=false`、`mainDir="skills"`、`draftsDir="skills/_drafts"`。
+	 */
+	val enableSkillManageTool: Boolean = false,
+	/**
+	 * 是否开启「技能策展」：定期对技能做自动生命周期迁移（stale/archive）。
+	 * 对应官方 `HarnessAgent$Builder.enableSkillCurator(SkillCuratorConfig)`，采用官方 `defaults()`，
+	 * **不覆盖任何字段**——即 `intervalHours=168`、`staleAfterDays=30`、`archiveAfterDays=90`、
+	 * `umbrellaPassMode=DRY_RUN_ONLY`（默认只演练报告、不实际归档）。
+	 */
+	val enableSkillCurator: Boolean = false,
+	/**
+	 * 声明式工具配置，官方 [ToolsConfig] JavaBean，Spring 直接绑定。
+	 *
+	 * <p>核心字段 `mcpServers: Map<String, McpServerConfig>` 即「连接器」：每个 entry 是一个 MCP
+	 * server，`McpServerConfig` 用 `transport`（stdio/sse/streamableHttp）+ `command`/`args`/`env`
+	 * （stdio）或 `url`/`headers`（sse/streamableHttp）声明。传给
+	 * `HarnessAgent$Builder.toolsConfig(...)` 后，官方 `McpServerRegistrar` 会**自动构建
+	 * `McpClientBuilder` + `buildSync()` + 注册**，无需手动 new 任何组件。
+	 *
+	 * <p>MCP 是 per-agent 的：每个 [HarnessAgent] 持有独立的 `ownedMcpToolkit`，互不共享。
+	 */
+	val toolsConfig: ToolsConfig? = null,
 )

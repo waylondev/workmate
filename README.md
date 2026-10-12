@@ -15,7 +15,8 @@
 | 子智能体 | 统一 `agent_spawn` 工具派发 subagent，高风险操作同样走审批 |
 | 定时任务 | cron 驱动 Agent 自动执行，官方 Quartz 扩展 + 执行历史（状态 / 输出 / token）落盘 |
 | 多 Agent | YAML 声明式目录（`default` / `coder` / `explorer`…），按 agent 隔离工作区与权限模式 |
-| 技能系统 | 复用官方 `AgentSkillRepository`：枚举 / 删除（归档语义） |
+| 技能系统 | 复用官方 `AgentSkillRepository`：枚举 / 删除（归档语义）；可选开启「技能自管理 + 策展」（agent 沉淀经验为技能） |
+| 连接器（MCP） | 官方 `ToolsConfig.mcpServers` 声明式接入外部 MCP server（stdio / sse / streamableHttp），per-agent 独立 |
 | 会话管理 | 转录 JSONL 落盘为真相来源，重启续聊；列表 / 删除（真删服务端目录） |
 | Agent 管理 | 注销 / 重新注册（官方 `AguiAgentRegistry`，可逆） |
 
