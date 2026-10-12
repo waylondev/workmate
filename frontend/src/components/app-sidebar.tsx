@@ -58,7 +58,7 @@ export function AppSidebar({
   return (
     <aside className="glass border-border/60 relative z-10 hidden w-64 shrink-0 flex-col border-r lg:flex">
       <div className="flex items-center gap-2 px-3 py-3">
-        <div className="text-primary-foreground btn-brand flex size-7 items-center justify-center rounded-lg shadow-[0_0_16px_-4px_var(--color-brand-violet)]">
+        <div className="text-primary-foreground btn-brand flex size-7 items-center justify-center rounded-lg shadow-glow-sm">
           <SparklesIcon className="size-4" />
         </div>
         <span className="text-gradient text-sm font-semibold tracking-tight">Workmate</span>
@@ -176,7 +176,7 @@ function SidebarRow({
       className={cn(
         "flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-start text-[13px] transition-colors",
         active
-          ? "bg-primary/10 text-foreground shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-primary)_25%,transparent)]"
+          ? "bg-primary/10 text-foreground shadow-inset-primary"
           : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
       )}
     >
@@ -203,7 +203,7 @@ function SessionRow({
       className={cn(
         "group flex items-center gap-1 rounded-lg transition-colors",
         active
-          ? "bg-primary/10 text-foreground shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-primary)_25%,transparent)]"
+          ? "bg-primary/10 text-foreground shadow-inset-primary"
           : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
       )}
     >

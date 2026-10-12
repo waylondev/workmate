@@ -98,6 +98,22 @@
 
   --color-brand-cyan: var(--brand-cyan);
   --color-brand-violet: var(--brand-violet);
+
+  /*
+   * 品牌光晕阴影令牌：替代散落在组件里的硬编码 `shadow-[0_0_…]`。
+   * 三级强度分别对应「小图标 / 中图标 / 大图标」的品牌发光，深色下更明显，
+   * 但都保持克制的冷色光晕，避免廉价霓虹。
+   */
+  --shadow-glow-sm: 0 0 16px -4px var(--brand-violet);
+  --shadow-glow-md: 0 0 24px -6px var(--brand-violet);
+  --shadow-glow-lg: 0 0 40px -10px var(--brand-violet);
+
+  /* 卡片悬浮阴影：深色下用更柔和的远距离阴影营造浮起感 */
+  --shadow-float: 0 8px 24px -12px rgb(0 0 0 / 45%);
+
+  /* 选中态内描边（侧栏 active 项 / chip）：用 inset ring 而非 border，避免布局抖动 */
+  --shadow-inset-primary: inset 0 0 0 1px
+    color-mix(in oklab, var(--color-primary) 25%, transparent);
 }
 
 @layer base {

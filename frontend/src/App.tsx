@@ -431,7 +431,7 @@ function Welcome({ agentId }: { agentId: string }) {
   if (!agent) return null
   return (
     <div className="aui-thread-welcome-root fade-in slide-in-from-bottom-1 animate-in fill-mode-both mb-8 flex flex-col items-center px-4 text-center duration-200">
-      <div className="text-primary-foreground btn-brand mb-4 flex size-12 items-center justify-center rounded-2xl shadow-[0_0_30px_-6px_var(--color-brand-violet)]">
+      <div className="text-primary-foreground btn-brand mb-4 flex size-12 items-center justify-center rounded-2xl shadow-glow-lg">
         <SparklesIcon className="size-6" />
       </div>
       <h1 className="text-gradient text-3xl font-semibold tracking-tight text-balance">
