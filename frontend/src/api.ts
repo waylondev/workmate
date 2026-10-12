@@ -147,6 +147,23 @@ export type JobMeta = {
 
 export type JobCancellation = { name: string; cancelled: boolean }
 
+/** 一次定时任务触发的执行记录。 */
+export type JobExecution = {
+  jobName: string
+  /** 开始时间（epoch millis）。 */
+  startedAt: number
+  /** 结束时间（epoch millis），失败/未完成时可能为空。 */
+  finishedAt: number | null
+  /** `success` / `failed`。 */
+  status: string
+  /** 模型输出文本（成功时）。 */
+  output: string | null
+  /** 失败原因（失败时）。 */
+  error: string | null
+  inputTokens: number | null
+  outputTokens: number | null
+}
+
 export async function createJob(job: {
   name: string
   agentId: string
@@ -161,6 +178,10 @@ export async function createJob(job: {
 
 export async function listJobs(): Promise<JobMeta[]> {
   return json<JobMeta[]>(`${BASE}/jobs`)
+}
+
+export async function listJobExecutions(jobName: string): Promise<JobExecution[]> {
+  return json<JobExecution[]>(`${BASE}/jobs/${encodeURIComponent(jobName)}/executions`)
 }
 
 export async function cancelJob(jobName: string): Promise<JobCancellation> {

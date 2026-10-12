@@ -37,6 +37,11 @@ class JobController(
 	@DeleteMapping("/{jobName}")
 	fun cancelJob(@PathVariable jobName: String): JobCancellation =
 		JobCancellation(name = jobName, cancelled = jobSchedulerService.cancel(jobName))
+
+	/** 返回某任务的执行历史（新的在前）。任务不存在时返回空列表。 */
+	@GetMapping("/{jobName}/executions")
+	fun listExecutions(@PathVariable jobName: String): List<JobExecution> =
+		jobSchedulerService.listExecutions(jobName)
 }
 
 data class CreateJobRequest(

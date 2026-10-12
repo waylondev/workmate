@@ -5,8 +5,8 @@ import io.agentscope.core.model.Model
 import io.agentscope.extensions.scheduler.AgentScheduler
 import io.agentscope.extensions.scheduler.BaseScheduleAgentTask
 import io.agentscope.extensions.scheduler.ScheduleAgentTask
-import io.agentscope.extensions.scheduler.config.AgentConfig
 import io.agentscope.extensions.scheduler.config.ModelConfig
+import io.agentscope.extensions.scheduler.config.RuntimeAgentConfig
 import io.agentscope.extensions.scheduler.config.ScheduleConfig
 import io.agentscope.extensions.scheduler.quartz.QuartzAgentScheduler
 import org.quartz.CronExpression
@@ -40,17 +40,26 @@ class JobSchedulerConfiguration {
 		JobDefinitionStore(JOB_DEFINITIONS_FILE)
 
 	@Bean
+	fun jobExecutionStore(): JobExecutionStore =
+		JobExecutionStore(JOB_EXECUTIONS_FILE)
+
+	@Bean
 	fun jobSchedulerService(
 		scheduler: AgentScheduler,
 		model: Model,
 		properties: WorkmateProperties,
 		store: JobDefinitionStore,
-	): JobSchedulerService = JobSchedulerService(scheduler, model, properties, store)
+		executionStore: JobExecutionStore,
+	): JobSchedulerService = JobSchedulerService(scheduler, model, properties, store, executionStore)
 
 	private companion object {
 		/** 任务定义落盘位置：运行态数据，随 `.agentscope/` 一起被 `.gitignore` 忽略。 */
 		val JOB_DEFINITIONS_FILE: java.nio.file.Path =
 			java.nio.file.Path.of(".agentscope", "jobs.json")
+
+		/** 执行历史落盘位置：同上，运行态数据。 */
+		val JOB_EXECUTIONS_FILE: java.nio.file.Path =
+			java.nio.file.Path.of(".agentscope", "job-executions.json")
 	}
 }
 
@@ -87,6 +96,7 @@ class JobSchedulerService(
 	private val model: Model,
 	private val properties: WorkmateProperties,
 	private val store: JobDefinitionStore,
+	private val executionStore: JobExecutionStore,
 ) {
 
 	private val definitions = ConcurrentHashMap<String, JobDefinition>()
@@ -124,10 +134,14 @@ class JobSchedulerService(
 			throw ApiException.conflict("job already exists: $name")
 		}
 
-		val agentConfig = AgentConfig.builder()
+		// 用 RuntimeAgentConfig（而非基类 AgentConfig）以注入官方 Hook：scheduler 内部
+		// 只有在收到 RuntimeAgentConfig 时才会保留 hooks，否则会丢（基类无 hooks 字段）。
+		// ExecutionRecordingHook 在每次触发时捕获输出与 token，写入执行历史。
+		val agentConfig = RuntimeAgentConfig.builder()
 			.name(name)
 			.sysPrompt(declared.sysPrompt)
 			.modelConfig(SharedModelConfig(model))
+			.hooks(listOf(ExecutionRecordingHook(name, executionStore)))
 			.build()
 
 		// mode 由显式调用的方法决定：cron(...) 即 ScheduleMode.CRON
@@ -152,13 +166,20 @@ class JobSchedulerService(
 		)
 	}
 
-	/** 取消任务（幂等）：不存在时返回 false，不报错。 */
+	/** 取消任务（幂等）：不存在时返回 false，不报错。取消时一并清理执行历史。 */
 	fun cancel(jobName: String): Boolean {
 		val name = jobName.trim()
 		val cancelled = scheduler.cancel(name)
-		if (definitions.remove(name) != null) persist()
+		if (definitions.remove(name) != null) {
+			persist()
+			executionStore.remove(name)
+		}
 		return cancelled
 	}
+
+	/** 返回某任务的执行历史（新的在前）。任务不存在时返回空列表（不报错）。 */
+	fun listExecutions(jobName: String): List<JobExecution> =
+		executionStore.list(jobName.trim())
 
 	/** 列出全部任务：以本服务的定义为主，同时纳入调度器中存在但定义缺失的任务（不隐藏）。 */
 	@Suppress("UNCHECKED_CAST")
@@ -196,10 +217,11 @@ class JobSchedulerService(
 			return
 		}
 		try {
-			val agentConfig = AgentConfig.builder()
+			val agentConfig = RuntimeAgentConfig.builder()
 				.name(def.name)
 				.sysPrompt(declared.sysPrompt)
 				.modelConfig(SharedModelConfig(model))
+				.hooks(listOf(ExecutionRecordingHook(def.name, executionStore)))
 				.build()
 			val scheduleConfig = ScheduleConfig.builder().cron(def.cron).build()
 			@Suppress("UNCHECKED_CAST")

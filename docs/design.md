@@ -226,11 +226,30 @@ hidden: false                              # 可选
 |---|---|
 | `POST /api/jobs` | 成功 201；参数不合法 → 400；agent 不存在 → 404；任务名重复 → 409 |
 | `GET /api/jobs` | 含 `id`（官方任务对象 id）/ `agentId` / `cron` / `executions`（已触发次数） |
-| `DELETE /api/jobs/{name}` | 幂等，`cancelled=false` 表示本就不存在 |
+| `GET /api/jobs/{name}/executions` | 该任务执行历史（新的在前），含 `status` / `output` / token / `startedAt` |
+| `DELETE /api/jobs/{name}` | 幂等，`cancelled=false` 表示本就不存在；取消时一并清理执行历史 |
 
 任务定义**已持久化**：`JobDefinitionStore` 把 `name → {agentId, cron}` 落盘到 `.agentscope/jobs.json`
 （运行态数据，随 `.agentscope/` 被 `.gitignore` 忽略），`JobSchedulerService` 启动时加载并重新注册回
 Quartz，创建/取消时同步写回。落盘失败只记日志、不阻断已注册的任务；文件损坏时视为空启动。
+
+**执行历史（P2-2）**：官方 scheduler-quartz **不提供执行结果回调**——`AgentQuartzJob.execute()` 调
+`task.run(...).block()` 后把返回的 `Msg` 直接丢弃，只 `incrementExecutionCount()`。捕获执行结果走的是
+官方另一条通道：**`io.agentscope.core.hook.Hook`**。关键事实（反编译确证）：
+
+1. `BaseScheduleAgentTask.createAgent()` 会把 `RuntimeAgentConfig.getHooks()` 非空时传给
+   `ReActAgent.builder().hooks(...)` —— hooks 通道完整可用；
+2. 但 `AgentScheduler.schedule(AgentConfig, ...)` 收到**基类 `AgentConfig`** 时会用
+   `RuntimeAgentConfig.builder()` 复制 name/modelConfig/sysPrompt 后 `build()`，**丢弃 hooks**。
+   因此必须直接传入 `RuntimeAgentConfig` 实例（`RuntimeAgentConfig.builder().hooks(...)`）才能让 hook 生效；
+3. `Hook` 是泛型方法 `<T extends HookEvent> Mono<T> onEvent(T)`，Kotlin 实现需用泛型签名；
+4. 监听 `HookEventType.POST_CALL`（`PostCallEvent.getFinalMessage()` 取输出与 `usage`）与
+   `HookEventType.ERROR`（`ErrorEvent.getError()` 取异常）即覆盖「成功 / 失败」两种结果；
+5. **Hook 列表跨触发共享同一个实例**（`RuntimeAgentConfig` 持有同一个 `List<Hook>`），因此实现必须
+   **无状态**——每次 POST_CALL/ERROR 独立落盘，不能持有「单次触发」的跨调用标志，否则多次触发只记第一条。
+
+`ExecutionRecordingHook`（无状态）+ `JobExecutionStore`（落盘 `.agentscope/job-executions.json`，
+每任务保留最近 50 条）共同实现执行历史。全程复用官方 `Hook` 扩展点，不 fork、不扩展官方类。
 
 ### 3.5 错误契约
 

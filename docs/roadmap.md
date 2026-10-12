@@ -37,8 +37,8 @@
 
 | # | 优化点 | 说明 |
 |---|---|---|
-| P2-1 | token 用量可视化 | 已 emit `token_usage` 事件，前端未展示 |
-| P2-2 | 定时任务执行历史 / 日志 | 现在只有 `executions` 计数，无明细 |
+| P2-1 | token 用量可视化 | 已 emit `token_usage` 事件，前端已展示 |
+| P2-2 | 定时任务执行历史 / 日志 | 已实现：`GET /api/jobs/{name}/executions`，官方 Hook 捕获输出/token |
 | P2-3 | 移动端响应式 | 三栏在窄屏体验差 |
 
 ## 明确不做（架构决策）
@@ -61,3 +61,4 @@
 - 2026-10-12：P1-1（服务端会话列表/删除）已实现——`SessionAdminService` 直接操作 `workspace/{threadId}/` 目录，官方无会话管理 API（`listSessionLogFiles` 命名空间相关），端到端验证通过。
 - 2026-10-12：撤销 P1-3「会话续聊 resume 入口」——经反编译核验，官方 `AguiResume`/`AguiResumeCoordinator` 的 `interruptId` 只在单次运行内存态，不落盘、后端重启即丢，跨刷新/重启无 id 可 resume；正常审批闭环前端已通。移入「明确不做」N-6。
 - 2026-10-12：撤销 P1-2「Agent 定义热加载」——官方 `AguiAgentRegistry` 无 reload 定义 API（只有 register/unregister），且此需求已被子智能体声明机制（`workspace/subagents/*.md` 官方自动装配）替代。移入「明确不做」N-7；同步新增 `subagents/` 的 `.gitignore` 豁免与 `design.md` §3.2.1 说明。
+- 2026-10-12：P2-2（定时任务执行历史）已实现——经反编译确证官方 `AgentScheduler` 的 hooks 通道（需直接传 `RuntimeAgentConfig` 而非基类 `AgentConfig`，且 `Hook` 列表跨触发共享须无状态），用 `ExecutionRecordingHook` + `JobExecutionStore` 捕获每次触发的输出/token/状态，新增 `GET /api/jobs/{name}/executions`，端到端验证计数与明细对齐。

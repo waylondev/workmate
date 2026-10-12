@@ -3,11 +3,13 @@ import {
   createJob,
   deleteSkill,
   listAgents,
+  listJobExecutions,
   listJobs,
   listSkills,
   registerAgent,
   unregisterAgent,
   type AgentMeta,
+  type JobExecution,
   type JobMeta,
   type SkillMeta,
 } from "@/api"
@@ -275,6 +277,9 @@ function JobsPanel({ setError, setNotice }: Report) {
   const [agentId, setAgentId] = useState("default")
   const [cron, setCron] = useState("")
   const [loading, setLoading] = useState(true)
+  // 展开的执行历史：jobName → 记录列表
+  const [executions, setExecutions] = useState<Record<string, JobExecution[]>>({})
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   const refresh = () => {
     setLoading(true)
@@ -288,6 +293,16 @@ function JobsPanel({ setError, setNotice }: Report) {
   }
 
   useEffect(refresh, [])
+
+  const toggleExecutions = (jobName: string) => {
+    const isExpanded = expanded[jobName]
+    setExpanded((prev) => ({ ...prev, [jobName]: !isExpanded }))
+    if (!isExpanded) {
+      listJobExecutions(jobName)
+        .then((data) => setExecutions((prev) => ({ ...prev, [jobName]: data })))
+        .catch((cause: unknown) => setError(fail("加载执行历史失败", cause)))
+    }
+  }
 
   const onCreate = () => {
     if (!name || !cron) {
@@ -350,32 +365,95 @@ function JobsPanel({ setError, setNotice }: Report) {
           {jobs.map((job) => (
             <li
               key={job.name}
-              className="border-border/60 flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5"
+              className="border-border/60 flex flex-col rounded-xl border px-3 py-2.5"
             >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{job.name}</p>
-                <p className="text-muted-foreground truncate font-mono text-xs">
-                  {job.cron} · {job.agentId} · 已触发 {job.executions} 次
-                </p>
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggleExecutions(job.name)}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <p className="truncate text-sm font-medium">{job.name}</p>
+                  <p className="text-muted-foreground truncate font-mono text-xs">
+                    {job.cron} · {job.agentId} · 已触发 {job.executions} 次
+                  </p>
+                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => toggleExecutions(job.name)}
+                  >
+                    {expanded[job.name] ? "收起" : "执行记录"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      cancelJob(job.name)
+                        .then((result) => {
+                          setNotice(result.cancelled ? `${job.name} 已取消` : `${job.name} 本就不存在`)
+                          setError(null)
+                          refresh()
+                        })
+                        .catch((cause: unknown) => setError(fail("取消失败", cause)))
+                    }
+                  >
+                    取消
+                  </Button>
+                </div>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  cancelJob(job.name)
-                    .then((result) => {
-                      setNotice(result.cancelled ? `${job.name} 已取消` : `${job.name} 本就不存在`)
-                      setError(null)
-                      refresh()
-                    })
-                    .catch((cause: unknown) => setError(fail("取消失败", cause)))
-                }
-              >
-                取消
-              </Button>
+
+              {expanded[job.name] && (
+                <div className="mt-2 flex flex-col gap-1.5 border-t pt-2">
+                  {(executions[job.name] ?? []).length === 0 ? (
+                    <p className="text-muted-foreground text-xs">暂无执行记录</p>
+                  ) : (
+                    (executions[job.name] ?? []).map((ex, idx) => (
+                      <ExecutionRow key={`${ex.startedAt}-${idx}`} execution={ex} />
+                    ))
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  )
+}
+
+/** 单条执行记录：时间、状态、token 用量与输出/错误摘要。 */
+function ExecutionRow({ execution }: { execution: JobExecution }) {
+  const status = execution.status === "success"
+  const started = new Date(execution.startedAt).toLocaleString()
+  const tokens =
+    execution.inputTokens != null || execution.outputTokens != null
+      ? `（in ${execution.inputTokens ?? 0} / out ${execution.outputTokens ?? 0}）`
+      : ""
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-1 rounded-lg border px-2.5 py-2 text-xs",
+        status ? "border-border/60" : "border-destructive/40 bg-destructive/5",
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <span
+          className={cn(
+            "inline-block h-2 w-2 shrink-0 rounded-full",
+            status ? "bg-emerald-500" : "bg-red-500",
+          )}
+        />
+        <span className="font-medium">{status ? "成功" : "失败"}</span>
+        <span className="text-muted-foreground">{started}</span>
+        <span className="text-muted-foreground ml-auto font-mono">{tokens}</span>
+      </div>
+      {status && execution.output ? (
+        <p className="text-muted-foreground line-clamp-3 whitespace-pre-wrap">{execution.output}</p>
+      ) : (
+        <p className="text-destructive line-clamp-3">{execution.error ?? "未知错误"}</p>
       )}
     </div>
   )
