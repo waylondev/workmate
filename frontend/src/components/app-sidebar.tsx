@@ -217,8 +217,8 @@ function SessionRow({
         type="button"
         onClick={() => onDelete(session.threadId)}
         className="text-muted-foreground hover:text-destructive me-1.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-        aria-label={`从最近列表移除 ${session.title}`}
-        title="从最近列表移除（服务端转录保留）"
+        aria-label={`删除会话 ${session.title}`}
+        title="删除会话（清空服务端转录，不可恢复）"
       >
         <Trash2Icon className="size-3.5" />
       </button>

@@ -30,7 +30,7 @@
 
 | # | 优化点 | 影响 |
 |---|---|---|
-| P1-1 | **服务端会话列表 / 删除** | 侧栏「移除」只清 localStorage，转录仍留盘 |
+| P1-1 | ~~服务端会话列表 / 删除~~ | ✅ 已实现（`SessionAdminService` 直删 `workspace/{threadId}/` 目录） |
 | P1-2 | **Agent 定义热加载** | 只支持注册态切换，定义无法运行时增删改 |
 | P1-3 | **会话续聊（resume）显式入口** | 复用带未决审批 threadId 需先 resume，当前靠前端兜底 |
 
@@ -57,3 +57,4 @@
 - 2026-10-12：建立本路线图；P0-2（硬编码密钥）已确认并修复。
 - 2026-10-12：P0-1（定时任务持久化）已实现——`JobDefinitionStore` 落盘 `.agentscope/jobs.json`，重启恢复，端到端验证通过。
 - 2026-10-12：撤销原 P1-1「技能恢复接口」——经反编译核验，官方 `AgentSkillRepository` 无 unarchive/启停能力，`delete()` 归档仅为兜底非承诺可逆；不做超出官方能力的自建语义，移入「明确不做」N-5。
+- 2026-10-12：P1-1（服务端会话列表/删除）已实现——`SessionAdminService` 直接操作 `workspace/{threadId}/` 目录，官方无会话管理 API（`listSessionLogFiles` 命名空间相关），端到端验证通过。

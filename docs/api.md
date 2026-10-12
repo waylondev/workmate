@@ -42,9 +42,22 @@
 | 方法 | 路径 | 说明 | 成功 |
 |---|---|---|---|
 | GET | `/api/agents/{id}/skills` | 技能及来源仓库（`repositories` / `writable` / `deletable`） | 200 |
-| DELETE | `/api/agents/{id}/skills/{name}` | 删除 = **归档**（可恢复）；不存在 404，只读 409 | 200 |
+| DELETE | `/api/agents/{id}/skills/{name}` | 删除（**不可逆**）；不存在 404，只读 409 | 200 |
 
-响应 `DELETE` 含 `archived`：true = 归档到 `.archive/`；false = 硬删除。
+响应 `DELETE` 含 `archived`：true = 官方 `delete()` 内部 move 到 `.archive/`（兜底，**非承诺可恢复**）；false = 硬删除。本项目不提供技能恢复接口。
+
+## 会话管理（`/api/agents/{id}/sessions`）
+
+| 方法 | 路径 | 说明 | 成功 |
+|---|---|---|---|
+| GET | `/api/agents/{id}/sessions` | 列出该 agent 的全部会话（`sessionId` / `agentName` / `updatedAt`） | 200 |
+| DELETE | `/api/agents/{id}/sessions/{sessionId}` | 删除单个会话的**整个落盘目录**（不可逆）；不存在 404，路径穿越 400 | 200 |
+
+`sessionId` 即前端 AG-UI 的 `threadId`，同时是 `{workspace}/{threadId}/` 落盘目录名。删除清掉
+该目录下的转录 `.jsonl` 与事件流 `events/`。响应 `DELETE` 含 `removedFiles`（删除的文件数）。
+
+> 官方**没有**会话管理 API（`WorkspaceManager.listSessionLogFiles` 是命名空间相关的，不适合管理面），
+> 故本服务直接操作 `config.workspace + threadId` 目录，删除即不可逆。
 
 ## 定时任务（`/api/jobs`）
 

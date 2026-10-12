@@ -77,7 +77,7 @@ AgentScope 相关依赖（`io.agentscope:2.0.4`）：
 - **右栏「对话摘要」不维护独立状态**：`src/work-progress.ts` 是从 assistant-ui 的 `AssistantState["thread"]["messages"]` 派生数据的纯函数（工具调用 → 工作步骤，含进行中 / 完成 / 失败三态，以及对话产物、最近文件）。因此右栏必须渲染在 `AgUiRuntimeProvider` 之内。
 - **锚点联动**：输入区的 `ComposerChips`（agent / 权限 / 技能 / 工作进度 chip）经 `ChatChrome.revealPanel(section)` 展开右栏并滚动到 `#summary-{section}`。
 - **工具授权**：工具需授权时，中栏顶部弹出 `ApprovalBanner`（醒目横幅，列出待确认工具），可直接「允许 / 全部允许 / 拒绝」，并可勾选「本会话内自动批准」。待授权项由 `src/approvals.ts` 的纯函数从消息树派生，批准经 `ag-ui-runtime-provider.tsx` 暴露的 `respondToToolApproval` 回传后端。工具卡在 `requires-action` 态收起时即高亮（琥珀色边框 + 「待授权」徽章）。
-- **会话目录在前端**：`src/sessions.ts` 用 localStorage 维护 `threadId → { agentId, title, updatedAt }`，首条用户消息自动生成标题。真正的对话转录由后端 SessionTree 落盘，侧栏的「移除」只影响本地目录。
+- **会话目录在前端**：`src/sessions.ts` 用 localStorage 维护 `threadId → { agentId, title, updatedAt }`，首条用户消息自动生成标题。真正的对话转录由后端 SessionTree 落盘，侧栏「移除」会调用 `DELETE /api/agents/{id}/sessions/{threadId}` **真删**服务端转录目录（不可逆）。
 - `src/agents.ts` 是前端的 agent 目录（与后端 `workmate.agents` 一一对应），左栏「工作区」段与输入区 chip 都可切换 `default / coder / explorer`；切换时以 `key` 重挂载运行时，每个 agent 是一段独立会话。
 
 ## 目录结构
@@ -93,8 +93,11 @@ workmate/
 │   │   ├── AgentConfiguration.kt       # 把 agent 注册到 AG-UI 官方注册表
 │   │   └── AgentAdminController.kt     # /api/agents：枚举 + 注销 + 重新注册
 │   ├── skill/
-│   │   ├── SkillAdminService.kt        # 技能枚举 / 归档删除（复用官方 AgentSkillRepository）
+│   │   ├── SkillAdminService.kt        # 技能枚举 / 删除（复用官方 AgentSkillRepository）
 │   │   └── SkillController.kt          # /api/agents/{id}/skills
+│   ├── session/
+│   │   ├── SessionAdminService.kt      # 会话列表 / 删除（直删 workspace/{threadId}/ 目录）
+│   │   └── SessionController.kt        # /api/agents/{id}/sessions
 │   ├── job/
 │   │   ├── JobSchedulerConfiguration.kt # Quartz 调度 Bean（官方扩展）+ JobSchedulerService
 │   │   ├── JobDefinitionStore.kt        # 任务定义落盘（.agentscope/jobs.json，重启恢复）
@@ -274,7 +277,9 @@ RUN_STARTED → REASONING_MESSAGE_* → TOOL_CALL_START → TOOL_CALL_ARGS ×3 �
 | DELETE | `/api/agents/{id}` | 从 AG-UI 注册表注销（可逆） |
 | POST | `/api/agents/{id}/register` | 重新注册（与注销成对，避免不可逆操作） |
 | GET | `/api/agents/{id}/skills` | 该 agent 的技能及来源仓库（`repositories` / `writable` / `deletable`） |
-| DELETE | `/api/agents/{id}/skills/{name}` | 删除技能，语义为**归档**（移到 `skills/.archive/<name>-<ts>`，可恢复） |
+| DELETE | `/api/agents/{id}/skills/{name}` | 删除技能（**不可逆**；`archived` 字段仅反映官方 `delete()` 是否 move 到 `.archive/` 兜底） |
+| GET | `/api/agents/{id}/sessions` | 该 agent 的全部会话（`sessionId` / `agentName` / `updatedAt`） |
+| DELETE | `/api/agents/{id}/sessions/{sessionId}` | 删除会话的整个落盘目录（**不可逆**），返回 `removedFiles` |
 | GET | `/api/jobs` | 定时任务列表（含 `id` / `agentId` / `cron` / `executions`） |
 | POST | `/api/jobs` | 创建任务（`name` / `agentId` / `cronExpression`），成功返回 201 |
 | DELETE | `/api/jobs/{name}` | 取消任务（幂等） |

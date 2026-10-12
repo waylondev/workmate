@@ -100,6 +100,37 @@ export async function deleteSkill(agentId: string, skillName: string): Promise<S
   return json<SkillDeletion>(`${BASE}/agents/${agentId}/skills/${skillName}`, { method: "DELETE" })
 }
 
+// ---- 会话 ----
+
+export type SessionMeta = {
+  agentId: string
+  sessionId: string
+  /** 该会话所属的 agent 名（`{agentName}`，非 id）。 */
+  agentName: string
+  /** 会话日志文件最后修改时间（epoch millis）。 */
+  updatedAt: number
+}
+
+export type SessionDeletion = {
+  agentId: string
+  sessionId: string
+  deleted: boolean
+  removedFiles: number
+}
+
+export async function listSessions(agentId: string): Promise<SessionMeta[]> {
+  return json<SessionMeta[]>(`${BASE}/agents/${agentId}/sessions`)
+}
+
+export async function deleteSession(
+  agentId: string,
+  sessionId: string,
+): Promise<SessionDeletion> {
+  return json<SessionDeletion>(`${BASE}/agents/${agentId}/sessions/${sessionId}`, {
+    method: "DELETE",
+  })
+}
+
 // ---- 定时任务 ----
 
 export type JobMeta = {

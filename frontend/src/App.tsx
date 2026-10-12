@@ -1,5 +1,6 @@
 import { AgUiRuntimeProvider } from "@/ag-ui-runtime-provider"
 import { classifyAguiFailure, type AguiFailure } from "@/agui-errors"
+import { ApiError, deleteSession as deleteSessionApi } from "@/api"
 import { AGENTS, agentById } from "@/agents"
 import { AdminPanel } from "@/AdminPanel"
 import { ChatChromeProvider, type ChatChrome, type PanelSection } from "@/chat-chrome"
@@ -81,8 +82,25 @@ export default function App() {
     setNav("chat")
   }
 
-  /** 从本地最近列表移除（前端目录）。服务端转录由后端 SessionTree 持有，不受影响。 */
-  const deleteSession = (id: string) => {
+  /**
+   * 删除会话：先删服务端转录文件，再移除本地目录。
+   *
+   * <p>后端删除是**不可逆**的真删（`DELETE /api/agents/{id}/sessions/{threadId}`，清掉
+   * `.jsonl` + `.log.jsonl`）。若服务端已无该会话（404），仍允许从本地列表移除，避免
+   * 用户卡在一个删不掉的条目上。
+   */
+  const deleteSession = async (id: string) => {
+    const target = sessions.find((session) => session.threadId === id)
+    if (target) {
+      try {
+        await deleteSessionApi(target.agentId, id)
+      } catch (error) {
+        // 404（服务端本就无转录）静默降级；其余错误也先移除本地，避免阻塞
+        if (!(error instanceof ApiError && error.status === 404)) {
+          console.warn("删除会话转录失败，仍移除本地目录", error)
+        }
+      }
+    }
     setSessions((prev) => {
       const next = prev.filter((session) => session.threadId !== id)
       if (id === threadId) {
