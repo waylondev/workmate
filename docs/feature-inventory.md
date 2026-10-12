@@ -21,15 +21,15 @@
 
 | 端点 | 方法 | 功能 | 关键语义 | 覆盖 |
 |---|---|---|---|---|
-| `/api/agents/{agentId}/skills` | GET | 列出 agent 可见技能 | 含来源仓库/可写性/删除语义 | — |
-| `/api/agents/{agentId}/skills/{name}` | DELETE | 删除技能 | 归档或硬删除（`archived` 字段如实反映）；只读→409 | — |
+| `/api/agents/{agentId}/skills` | GET | 列出 agent 可见技能 | 含来源仓库/可写性/删除语义 | 实测 ✅ |
+| `/api/agents/{agentId}/skills/{name}` | DELETE | 删除技能 | 归档（`.archive/<name>-<ts>`）；只读→409 | 实测 ✅ |
 
 ### 3. 会话管理 `/api/agents/{agentId}/sessions`
 
 | 端点 | 方法 | 功能 | 关键语义 | 覆盖 |
 |---|---|---|---|---|
-| `/api/agents/{agentId}/sessions` | GET | 列出 agent 真实会话 | 来自服务端转录落盘 | — |
-| `/api/agents/{agentId}/sessions/{sessionId}` | DELETE | 删除会话转录文件 | **不可逆**；不存在→404 | — |
+| `/api/agents/{agentId}/sessions` | GET | 列出 agent 真实会话 | 来自服务端转录落盘 | 实测 ✅ |
+| `/api/agents/{agentId}/sessions/{sessionId}` | DELETE | 删除会话转录文件 | **不可逆**；不存在→404 | 实测 ✅ |
 
 ### 4. 定时任务 `/api/jobs`
 
@@ -87,12 +87,11 @@
 
 ## 四、覆盖缺口（已知无自动化）
 
-以下能力目前**没有**自动化测试，仅靠 `regression-checklist.md` 人肉覆盖。按影响排序：
+以下能力目前**没有**自动化测试（回归脚本未覆盖），仅靠人肉实测。按影响排序：
 
-1. **Skill 删除**：`DELETE /api/agents/{id}/skills/{name}` 有**已知缺陷**（`WorkspaceSkillRepository` 只读，删除静默失效返回 `deleted:false`）——见 MEMORY「待办/漂移」。**不建议在此修复前写自动化**，写了会固化错误行为。
-2. **Session 删除**：不可逆，需谨慎验证（避免误删真实会话）。
-3. **会话列表**：依赖真实对话产生转录，难做确定性单测。
-4. **思考折叠 / 工具卡视觉**：纯展示，无逻辑分支。
+1. **Skill 列表/删除**：依赖「技能目录里有真实技能文件」且文件带 YAML front matter，回归脚本难以构造确定性场景；已人肉实测通过（见 `verified-capabilities.md`）。
+2. **Session 列表/删除**：不可逆，需谨慎验证（避免误删真实会话）；已人肉实测通过。
+3. **思考折叠 / 工具卡视觉**：纯展示，无逻辑分支。
 
 ---
 

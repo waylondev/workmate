@@ -149,6 +149,7 @@ workmate/
 ├── docs/regression-checklist.md        # 回归验证清单（改动后重跑）
 ├── docs/testing-guide.md               # 自动化测试指南（三层金字塔 + 判绿标准）
 ├── docs/feature-inventory.md           # 功能清单（端点/前端/架构能力台账）
+├── docs/verified-capabilities.md       # 已验证功能清单（只列实测通过的能力）
 └── build.gradle.kts
 ```
 
