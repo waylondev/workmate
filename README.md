@@ -143,7 +143,10 @@ workmate/
 ├── docs/api.md                         # API 契约（REST + AG-UI）
 ├── docs/adr/                           # 技术决策记录（ADR）
 ├── docs/ui-guidelines.md               # 前端视觉 / 交互规范（唯一权威）
+├── docs/verification-report.md         # 联调验证报告
+├── docs/frontend-enhancement-report.md # 前端功能增强验证报告
 ├── docs/code-review-report.md          # 代码审查报告
+├── docs/regression-checklist.md        # 回归验证清单（改动后重跑）
 └── build.gradle.kts
 ```
 

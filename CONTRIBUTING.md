@@ -32,6 +32,8 @@
 cd frontend && pnpm check:ui && pnpm check:agui && pnpm lint && pnpm build
 ```
 
+改动涉及后端功能 / 前端交互时，按 `docs/regression-checklist.md` 端到端重跑一遍（三端健康、Agent、定时任务、AG-UI SSE、子智能体派发），记录真实结果。
+
 ## 完成定义
 
 代码 + 测试 + 文档 + 提交 + 汇报 + 无未批准依赖（详见 `AGENTS.md` §八）。
