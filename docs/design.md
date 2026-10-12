@@ -40,6 +40,7 @@
 | 调度配置 | `ScheduleConfig.builder().cron(...)`、`AgentConfig.builder().name/sysPrompt/modelConfig` | `JobSchedulerService` |
 | 会话持久化 | `SessionTree` → `{threadId}/agents/{AgentName}/sessions/{threadId}.jsonl` + `.log.jsonl`，另有 `sessions.json` 索引 | 会话内容的**真相来源** |
 | 事件持久化 | EVENT_LOG → `{threadId}/default/{AgentName}/{threadId}/events/*.jsonl` | 逐事件审计 |
+| 子智能体声明 | `AgentSpecLoader.loadFromDirectory(dir, basePath)` + `HarnessAgentBuilderSupport.buildSubagentEntries` | 官方从 `workspace/subagents/*.md` 自动装配（见 §3.2.1） |
 
 **踩坑记录（都吃过一次）**
 
@@ -50,6 +51,7 @@
 5. `HarnessAgent` 不暴露 `sysPrompt` getter；人设只能从 `workmate.agents.<id>` 配置取。
 6. `HarnessAgent` 缺省 description 会生成 `Agent(<uuid>) Name` 这类无意义字符串，必须显式给。
 7. 官方 `isTrivial()`：`permission-mode=default` 且**无工作目录、无规则**时，权限引擎退回轻量路径，配置的 `permission-mode` 不参与判定。
+8. **subagent 声明**：`HarnessAgent.build()` 时无条件 `workspace.resolve("subagents")`，目录存在才 `loadFromDirectory` 扫 `*.md`，不存在则静默跳过；每个 agent 恒带一个内置 `general-purpose` subagent。声明里 `description` 是**必填**字段，缺了整条声明被跳过。
 
 ## 0. 已实现范围
 
@@ -58,6 +60,7 @@
 | **会话** | 前端本地会话目录（localStorage）+ 后端 `SessionTree` 转录落盘；支持多轮上下文复用 |
 | **Agent 专家管理** | `GET /api/agents` 列表（定义 + 注册态）/ `DELETE` 注销 / `POST /register` 恢复 |
 | **技能管理** | `GET /api/agents/{id}/skills` 列出（含来源仓库与可写性）/ `DELETE` 归档删除 |
+| **子智能体** | 官方从 `workspace/subagents/*.md` 自动装配，无需自定义代码（见 §3.2.1） |
 | **定时任务** | `POST /api/jobs` 创建 cron / `GET` 列表（含已触发次数）/ `DELETE` 取消 |
 | **前端** | 三栏外壳（左栏导航 + 中栏对话 + 右栏「对话摘要」实时工作进度） |
 
@@ -146,6 +149,39 @@
 **注销是可逆的**（§技术决策 7）。这是历史缺陷的直接修复：原实现只动注册表而列表读 catalog，导致 UI 上「注销」既看不出效果、也不可恢复。
 
 `AgentCatalog` 是 `DisposableBean`，容器关闭时统一 `close()` 全部 `HarnessAgent`，避免 Toolkit / WorkspaceManager / state store 泄漏。
+
+### 3.2.1 子智能体（subagent）声明
+
+**官方机制，零自定义代码。** `HarnessAgent` 构建时会自动扫描 `<agent workspace>/subagents/*.md`，每个文件声明一个子智能体，`name` 取文件名（去 `.md`），body 是系统提示词。因此**新增领域子智能体不需要改代码、不需要重启后端定义**（下轮 agent 构建即扫目录）。
+
+声明格式是 Markdown，`---` 包裹 YAML front matter：
+
+```markdown
+---
+description: 只读代码审查，不修改任何文件   # 必填，缺了整条声明被跳过
+workspace:
+  mode: isolated | shared                  # 默认 isolated
+  path: ./subdir                           # 可选；给了 path 则 body 被忽略，提示词放 {path}/AGENTS.md
+mode: primary | subagent | all             # 默认 all
+tools: read_file, grep, glob               # 可选
+steps: 12                                  # 可选，默认 10（也认 maxIters）
+hidden: false                              # 可选
+---
+
+这里是子智能体的系统提示词（未指定 workspace.path 时生效）。
+```
+
+字段清单（`AgentSpecLoader.parse` 字节码常量池逐字提取）：`description`（必填）、
+`workspace.mode` / `workspace.path`、`model`、`steps` / `maxIters`、`temperature`、`top_p` / `topP`、
+`variant`、`mode`、`hidden`、`expose_to_user` / `exposeToUser`、`enable_pending_tool_recovery`、
+`tools`、`skills`。`workspace.path` 相对 agent 的 workspace 根解析。
+
+**边界（必须知道）**：
+
+- 三个顶层 agent（`default` / `coder` / `explorer`）是 **AG-UI 路由入口 = 主 agent**，仍须在 `workmate.agents` 声明；子智能体走 `workspace/subagents/*.md`，两者职责不同、不要混用。
+- 每个 agent 恒带一个内置 `general-purpose` 子智能体（同名能力、可整体委派隔离任务），无法移除。
+- 子智能体声明是**配置性质**，已加入 `.gitignore` 豁免（与 `AGENTS.md` / `knowledge/` 同级），随版本控制。
+- 运行中的后端不会热加载新声明的子智能体（agent 是启动期构建的），新增/修改后需重启才会生效。
 
 ### 3.3 技能管理
 

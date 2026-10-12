@@ -40,7 +40,8 @@ out/
 .kotlin
 
 ### AgentScope runtime state ###
-# 版本管理：每个 agent 的 AGENTS.md（人设）、MEMORY.md（记忆起始模板）、knowledge/（领域知识）。
+# 版本管理：每个 agent 的 AGENTS.md（人设）、MEMORY.md（记忆起始模板）、knowledge/（领域知识）、
+# subagents/（子智能体声明，官方从 workspace/subagents/*.md 自动装配）。
 # 其余运行态（memory/、sessions/、tasks/、skills/ 等）一律忽略。
 # 用 .agentscope/* 而非 .agentscope/：前者只忽略内容、目录仍可遍历，后者会整体排除导致下面的例外失效。
 .agentscope/*
@@ -50,6 +51,8 @@ out/
 !.agentscope/workspace/*/AGENTS.md
 !.agentscope/workspace/*/MEMORY.md
 !.agentscope/workspace/*/knowledge/
+!.agentscope/workspace/*/subagents/
+!.agentscope/workspace/*/subagents/*.md
 
 ### 本地运行态 ###
 # 联调 / 运行期日志（dev/*.log 等），不入库

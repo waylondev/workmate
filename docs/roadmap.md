@@ -31,7 +31,7 @@
 | # | 优化点 | 影响 |
 |---|---|---|
 | P1-1 | ~~服务端会话列表 / 删除~~ | ✅ 已实现（`SessionAdminService` 直删 `workspace/{threadId}/` 目录） |
-| P1-2 | **Agent 定义热加载** | 只支持注册态切换，定义无法运行时增删改 |
+| P1-2 | ~~Agent 定义热加载~~ | ✅ 已撤销，移入 N-7（官方无 reload API，且已被 subagent 机制替代） |
 
 ### P2 — 锦上添花
 
@@ -51,6 +51,7 @@
 | N-4 | `agentscope-admin-spring-boot-starter` | MVC 栈与 WebFlux 冲突 |
 | N-5 | 技能恢复（unarchive）/ 启停开关 | 官方 `AgentSkillRepository` 只有 `save`/`delete`，无恢复也无启停状态；`delete()` 内部 move 到 `.archive/` 只是避免直接删除的兜底，**非承诺可逆**。不做超出官方能力的自建语义 |
 | N-6 | 会话续聊（resume）显式入口 | 官方 resume（`AguiResume` / `AguiResumeCoordinator`）是**内存态、单次运行内**的：`interruptId` 只存在于当次 SSE 流与后端内存，不落盘、后端重启即丢。正常工具审批闭环前端已通（`respondToToolApproval`），跨刷新/跨重启场景无 id 可 resume。前端补「显式 resume 入口」是在依赖官方未承诺的生命周期，不做 |
+| N-7 | Agent 定义热加载 | 官方 `AguiAgentRegistry` 只支持运行时 `register`/`unregister`（切换注册态，项目已用），**没有**「从配置重新加载 agent 定义」的 API——`HarnessAgent` 是启动期 `build()` 一次性构建，无 reload 机制。且此需求已被**子智能体声明机制**替代：需要动态扩展的领域能力走 `workspace/subagents/*.md`（官方自动装配），顶层 agent（AG-UI 路由入口）本就该少数且稳定、改定义就该重启。不做 |
 
 ## 变更记录
 
@@ -59,3 +60,4 @@
 - 2026-10-12：撤销原 P1-1「技能恢复接口」——经反编译核验，官方 `AgentSkillRepository` 无 unarchive/启停能力，`delete()` 归档仅为兜底非承诺可逆；不做超出官方能力的自建语义，移入「明确不做」N-5。
 - 2026-10-12：P1-1（服务端会话列表/删除）已实现——`SessionAdminService` 直接操作 `workspace/{threadId}/` 目录，官方无会话管理 API（`listSessionLogFiles` 命名空间相关），端到端验证通过。
 - 2026-10-12：撤销 P1-3「会话续聊 resume 入口」——经反编译核验，官方 `AguiResume`/`AguiResumeCoordinator` 的 `interruptId` 只在单次运行内存态，不落盘、后端重启即丢，跨刷新/重启无 id 可 resume；正常审批闭环前端已通。移入「明确不做」N-6。
+- 2026-10-12：撤销 P1-2「Agent 定义热加载」——官方 `AguiAgentRegistry` 无 reload 定义 API（只有 register/unregister），且此需求已被子智能体声明机制（`workspace/subagents/*.md` 官方自动装配）替代。移入「明确不做」N-7；同步新增 `subagents/` 的 `.gitignore` 豁免与 `design.md` §3.2.1 说明。
