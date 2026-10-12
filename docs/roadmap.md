@@ -39,7 +39,6 @@
 |---|---|---|
 | P2-1 | token 用量可视化 | 已 emit `token_usage` 事件，前端已展示 |
 | P2-2 | 定时任务执行历史 / 日志 | 已实现：`GET /api/jobs/{name}/executions`，官方 Hook 捕获输出/token |
-| P2-3 | 移动端响应式 | 三栏在窄屏体验差 |
 
 ## 明确不做（架构决策）
 
@@ -52,9 +51,11 @@
 | N-5 | 技能恢复（unarchive）/ 启停开关 | 官方 `AgentSkillRepository` 只有 `save`/`delete`，无恢复也无启停状态；`delete()` 内部 move 到 `.archive/` 只是避免直接删除的兜底，**非承诺可逆**。不做超出官方能力的自建语义 |
 | N-6 | 会话续聊（resume）显式入口 | 官方 resume（`AguiResume` / `AguiResumeCoordinator`）是**内存态、单次运行内**的：`interruptId` 只存在于当次 SSE 流与后端内存，不落盘、后端重启即丢。正常工具审批闭环前端已通（`respondToToolApproval`），跨刷新/跨重启场景无 id 可 resume。前端补「显式 resume 入口」是在依赖官方未承诺的生命周期，不做 |
 | N-7 | Agent 定义热加载 | 官方 `AguiAgentRegistry` 只支持运行时 `register`/`unregister`（切换注册态，项目已用），**没有**「从配置重新加载 agent 定义」的 API——`HarnessAgent` 是启动期 `build()` 一次性构建，无 reload 机制。且此需求已被**子智能体声明机制**替代：需要动态扩展的领域能力走 `workspace/subagents/*.md`（官方自动装配），顶层 agent（AG-UI 路由入口）本就该少数且稳定、改定义就该重启。不做 |
+| N-8 | 移动端响应式 | 单机内部工具，桌面端使用为主；三栏在窄屏体验差但不构成使用障碍。不做，专注桌面端体验 |
 
 ## 变更记录
 
+- 2026-10-12：撤销 P2-3「移动端响应式」→ 移入「明确不做」N-8（单机内部工具，桌面端为主）。
 - 2026-10-12：前端 UI 专项优化（零新增依赖）——新增品牌光晕/内描边/悬浮阴影令牌、统一科技感细滚动条、
   欢迎页空态层级、输入区品牌发光焦点态；新建 `docs/ui-guidelines.md` 作为前端视觉唯一权威。
 - 2026-10-12：建立本路线图；P0-2（硬编码密钥）已确认并修复。

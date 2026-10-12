@@ -49,7 +49,7 @@
 2. 图标按钮必须有 `aria-label`（`TooltipIconButton` 已内置，直接用）。
 3. 键盘可达：可交互元素用真实 `<button>`，焦点态用 `focus-visible:ring-*`。
 4. 深色 / 浅色双主题都可用（`.dark` 类切换，`ThemeToggle` 控制），改视觉时两套都要检查。
-5. 移动端：三栏在窄屏退化为可折叠（见 `roadmap.md` P2-3，待做）。
+5. 桌面端优先：单机内部工具，不做移动端响应式适配（见 `roadmap.md` N-8）。
 
 ## 五、已落地的关键视觉资产
 
