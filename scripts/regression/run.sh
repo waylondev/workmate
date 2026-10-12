@@ -156,9 +156,16 @@ fi
 step "4. AG-UI SSE 流式对话"
 # =====================================================================
 if [ "$FULL" -eq 1 ]; then
-  SSE="$(CURL -N -m 90 "$BACKEND_URL/agui/run/default" \
+  # 注意：SSE 是流式输出，不能用 $(...) 命令替换捕获——那会在流中间态被截断（实测只拿到 666B）。
+  # 必须落盘到文件、curl 跑完后再读文件判断。
+  mkdir -p build/int
+  SSE_FILE="build/int/regress-sse.txt"
+  SSE_TID="regress-sse-$$-$(date +%s)"
+  CURL -N -m 90 "$BACKEND_URL/agui/run/default" \
     -H 'Content-Type: application/json' -H 'Accept: text/event-stream' \
-    -d '{"threadId":"regress-1","runId":"r1","tools":[],"context":[],"forwardedProps":{},"state":{},"messages":[{"id":"m1","role":"user","content":"你好，用一句话介绍你自己"}]}' 2>/dev/null)"
+    -d "{\"threadId\":\"$SSE_TID\",\"runId\":\"r1\",\"tools\":[],\"context\":[],\"forwardedProps\":{},\"state\":{},\"messages\":[{\"id\":\"m1\",\"role\":\"user\",\"content\":\"你好，用一句话介绍你自己\"}]}" \
+    > "$SSE_FILE" 2>/dev/null
+  SSE="$(cat "$SSE_FILE" 2>/dev/null)"
   check "SSE 含 RUN_STARTED" "$( printf '%s' "$SSE" | grep -q 'RUN_STARTED' && echo 1 || echo 0 )"
   check "SSE 含 TEXT_MESSAGE" "$( printf '%s' "$SSE" | grep -q 'TEXT_MESSAGE' && echo 1 || echo 0 )"
   check "SSE 含 token_usage" "$( printf '%s' "$SSE" | grep -q 'token_usage' && echo 1 || echo 0 )"
@@ -171,9 +178,16 @@ fi
 step "5. 子智能体派发（subagent）"
 # =====================================================================
 if [ "$FULL" -eq 1 ]; then
-  SUB="$(CURL -N -m 120 "$BACKEND_URL/agui/run/coder" \
+  mkdir -p build/int
+  SUB_FILE="build/int/regress-sub.txt"
+  # threadId 必须每次全新：subagent 会触发 permission_confirm 中断，若复用旧 thread 会残留
+  # 未决中断，后端直接 RUN_ERROR("unresolved interrupts")——回归脚本不响应审批，故必须随机化。
+  SUB_TID="regress-sub-$$-$(date +%s)"
+  CURL -N -m 180 "$BACKEND_URL/agui/run/coder" \
     -H 'Content-Type: application/json' -H 'Accept: text/event-stream' \
-    -d '{"threadId":"regress-sub","runId":"rs","tools":[],"context":[],"forwardedProps":{},"state":{},"messages":[{"id":"m1","role":"user","content":"调用 code-review 子智能体审查 JobController.kt"}]}' 2>/dev/null)"
+    -d "{\"threadId\":\"$SUB_TID\",\"runId\":\"rs\",\"tools\":[],\"context\":[],\"forwardedProps\":{},\"state\":{},\"messages\":[{\"id\":\"m1\",\"role\":\"user\",\"content\":\"调用 code-review 子智能体审查 JobController.kt\"}]}" \
+    > "$SUB_FILE" 2>/dev/null
+  SUB="$(cat "$SUB_FILE" 2>/dev/null)"
   check "SSE 含 agent_spawn 工具调用" \
     "$( printf '%s' "$SUB" | grep -q 'agent_spawn' && echo 1 || echo 0 )"
   check "SSE 含 permission_confirm 中断（HITL）" \
