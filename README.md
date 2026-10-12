@@ -4,7 +4,7 @@
 
 <video src="docs/regression-demo.mp4" autoplay loop muted playsinline width="100%"></video>
 
-> 上图：`bash scripts/regression/run.sh` 一键回归（`--full` 全量 23 项含真实模型调用）。若视频无法播放，见 [GIF 版](docs/regression-demo.gif)。
+> 上图（真实页面录屏）：发送消息 → HITL 审批横幅 → 点击「全部允许」→ 工具执行与流式回答（右栏 29 步工作进度）→ 定时任务 / 技能 / Agent 管理页。对应 CLI 一键回归：`bash scripts/regression/run.sh --full`（23 项含真实模型调用）。
 
 ## 核心功能（全部实测验证）
 
