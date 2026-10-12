@@ -61,6 +61,3 @@ out/
 dev/*.html
 # AI 助手在本机的记忆与技能工作区
 .workbuddy/
-# 含硬编码本机路径的一次性环境脚本（换机器即失效）
-dev/ollama-setup.ps1
-dev/start-ollama-dev.ps1

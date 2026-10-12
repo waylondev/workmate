@@ -1,4 +1,5 @@
 import { listJobs, listSkills, type JobMeta, type SkillMeta } from "@/api"
+import { useTokenUsage } from "@/ag-ui-runtime-provider"
 import { TooltipIconButton } from "@/components/tooltip-icon-button"
 import { cn } from "@/lib/utils"
 import { deriveArtifacts, deriveRecentFiles, deriveWorkSteps, type StepStatus } from "@/work-progress"
@@ -34,6 +35,7 @@ export function ConversationSummaryPanel({
 }) {
   const messages = useAuiState((s) => s.thread.messages)
   const isRunning = useAuiState((s) => s.thread.isRunning)
+  const tokenUsage = useTokenUsage()
 
   const steps = useMemo(() => deriveWorkSteps(messages), [messages])
   const artifacts = useMemo(() => deriveArtifacts(messages), [messages])
@@ -87,6 +89,7 @@ export function ConversationSummaryPanel({
           id="progress"
           title="工作进度"
           hint={isRunning ? "进行中" : steps.length > 0 ? `${steps.length} 步` : undefined}
+          first
         >
           {steps.length === 0 ? (
             <Empty>对话开始后自动汇总</Empty>
@@ -116,7 +119,24 @@ export function ConversationSummaryPanel({
           )}
         </Section>
 
-        <Section id="artifacts" title="对话产物" hint={artifacts.length > 0 ? `${artifacts.length}` : undefined} first>
+        <Section
+          id="tokens"
+          title="Token 用量"
+          hint={tokenUsage ? `${tokenUsage.calls} 次调用` : undefined}
+        >
+          {!tokenUsage ? (
+            <Empty>对话开始后自动统计</Empty>
+          ) : (
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+              <TokenStat label="输入" value={tokenUsage.input} />
+              <TokenStat label="输出" value={tokenUsage.output} />
+              <TokenStat label="思考" value={tokenUsage.reasoning} />
+              <TokenStat label="总计" value={tokenUsage.total} />
+            </dl>
+          )}
+        </Section>
+
+        <Section id="artifacts" title="对话产物" hint={artifacts.length > 0 ? `${artifacts.length}` : undefined}>
           {artifacts.length === 0 ? (
             <Empty>暂无产物</Empty>
           ) : (
@@ -224,6 +244,18 @@ function Section({
 
 function Empty({ children }: { children: ReactNode }) {
   return <p className="text-muted-foreground/70 text-xs">{children}</p>
+}
+
+/** 单个 token 指标：标签 + 千分位数字。 */
+function TokenStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex flex-col">
+      <dt className="text-muted-foreground/80 text-[11px] leading-4">{label}</dt>
+      <dd className="font-mono text-foreground text-[13px] leading-5 tabular-nums">
+        {value.toLocaleString("en-US")}
+      </dd>
+    </div>
+  )
 }
 
 function StepIcon({ status }: { status: StepStatus }) {

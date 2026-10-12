@@ -35,8 +35,7 @@
 ## 运行时环境
 
 - 后端 8080（Spring Boot 4.1.1 / Kotlin 2.3.21 / JDK 25），前端 Vite 5173（`/agui` `/api` 代理到 8080）。
-- 无 API Key 联调用 `dev/mock-openai-server.mjs`（OpenAI 兼容 SSE）。
-- 详见 `design.md` 与 `README.md` 的环境说明。
+- 模型接入走 CPA（CLIProxyAPI）反代的 WorkBuddy 真实模型（`hy3`），配置见 `application.yaml`；详见 `design.md` 与 `README.md` 的环境说明。
 
 ## 领域模型
 

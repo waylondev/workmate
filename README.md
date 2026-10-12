@@ -128,7 +128,7 @@ workmate/
 │   ├── scripts/ui-check.tsx            # SSR 三栏结构校验（pnpm check:ui）
 │   ├── scripts/agui-pipeline-check.ts  # HITL 审批管线校验（pnpm check:agui）
 │   └── vite.config.ts                  # Tailwind 插件 + @ 别名 + /agui + /api 代理
-├── dev/OLLAMA_联调启动说明.md        # 本机模型（CPA）联调启动步骤
+├── dev/联调启动说明.md              # 本机模型（CPA）联调启动步骤
 ├── AGENTS.md                           # 工程规范（编程思想 / 完成定义）
 ├── CONTRIBUTING.md                     # 贡献指南
 ├── LICENSE                             # Apache-2.0
@@ -227,7 +227,7 @@ cd frontend && pnpm install && pnpm dev
 
 ### 无 API Key 时的联调
 
-不配 Key 也能启动，但发消息时模型调用会失败。联调需接入模型：`application.yaml` 的 `openai.base-url` 默认指向本机 CLIProxyAPI（CPA，`127.0.0.1:8317`）反代的 WorkBuddy 模型，启动步骤见 `dev/OLLAMA_联调启动说明.md`。任何 OpenAI 兼容端点都能用同样的方式替换。
+不配 Key 也能启动，但发消息时模型调用会失败。联调需接入模型：`application.yaml` 的 `openai.base-url` 默认指向本机 CLIProxyAPI（CPA，`127.0.0.1:8317`）反代的 WorkBuddy 模型，启动步骤见 `dev/联调启动说明.md`。任何 OpenAI 兼容端点都能用同样的方式替换。
 
 ### 验证对话服务
 

@@ -1,10 +1,10 @@
-import { HttpAgent } from "@ag-ui/client"
+import { HttpAgent, type AgentSubscriber } from "@ag-ui/client"
 import {
   AssistantRuntimeProvider,
   type RespondToToolApprovalOptions,
 } from "@assistant-ui/react"
 import { useAgUiRuntime } from "@assistant-ui/react-ag-ui"
-import { createContext, useContext, useMemo, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { aguiSseFetch } from "@/agui-sse"
 
 /**
@@ -38,6 +38,65 @@ type ThreadBinding = {
     getState: () => {
       respondToToolApproval?: ApprovalRuntime["respondToToolApproval"]
     }
+  }
+}
+
+/**
+ * 单次模型调用结束时的 token 用量（后端 `AguiEvent.Custom(name="token_usage")` 的
+ * `delta` 字段，字段名与 `ModelCallUsageEventConverter.tokenUsageMap` 一致）。
+ */
+export type TokenUsageSnapshot = {
+  inputTokens?: number
+  outputTokens?: number
+  cachedTokens?: number
+  cacheCreationTokens?: number
+  reasoningTokens?: number
+  toolUsePromptTokens?: number
+  totalTokens?: number
+  time?: number
+}
+
+/** 会话级累计 token 用量，供右栏「Token 用量」展示。 */
+export type TokenUsageSummary = {
+  /** 累计输入 token（含缓存命中与工具调用提示）。 */
+  input: number
+  /** 累计输出 token。 */
+  output: number
+  /** 累计 reasoning（思考）token。 */
+  reasoning: number
+  /** 累计总 token。 */
+  total: number
+  /** 已完成的模型调用次数。 */
+  calls: number
+}
+
+const TokenUsageContext = createContext<TokenUsageSummary | null>(null)
+
+/** 读取当前会话累计 token 用量；未在 Provider 内或无数据时返回 null。 */
+export function useTokenUsage(): TokenUsageSummary | null {
+  return useContext(TokenUsageContext)
+}
+
+/**
+ * 从 `token_usage` CUSTOM 事件的 `cumulative` 字段累计 token 用量。
+ *
+ * <p>后端每次 `ModelCallEndEvent` 都发一个 `token_usage` CUSTOM 事件，payload 含
+ * `delta`（本次调用）与 `cumulative`（会话累计，字段与 delta 相同）。这里取
+ * `cumulative` 作为会话级真相，避免自己累加各次 delta 出现浮点/边界偏差。
+ *
+ * <p>字段映射（后端 `TokenUsageSnapshot` → 展示）：
+ * - 输入 = `inputTokens`
+ * - 输出 = `outputTokens`
+ * - 思考 = `reasoningTokens`
+ * - 总计 = `totalTokens`
+ */
+function toSummary(cumulative: TokenUsageSnapshot, calls: number): TokenUsageSummary {
+  return {
+    input: cumulative.inputTokens ?? 0,
+    output: cumulative.outputTokens ?? 0,
+    reasoning: cumulative.reasoningTokens ?? 0,
+    total: cumulative.totalTokens ?? 0,
+    calls,
   }
 }
 
@@ -80,6 +139,28 @@ export function AgUiRuntimeProvider({
 
   const runtime = useAgUiRuntime({ agent, onError })
 
+  // 订阅 token_usage CUSTOM 事件：每次模型调用结束，后端都发一个
+  // `AguiEvent.Custom(name="token_usage")`，payload 含 delta + cumulative。
+  // 取 cumulative 作为会话级累计，随调用次数更新。
+  const [tokenUsage, setTokenUsage] = useState<TokenUsageSummary | null>(null)
+  useEffect(() => {
+    const subscriber: AgentSubscriber = {
+      onCustomEvent: ({ event }) => {
+        if (event.name !== "token_usage") return
+        const value = event.value as
+          | { cumulative?: TokenUsageSnapshot; delta?: TokenUsageSnapshot }
+          | undefined
+        const cumulative = value?.cumulative ?? value?.delta
+        if (!cumulative) return
+        setTokenUsage((previous) =>
+          toSummary(cumulative, (previous?.calls ?? 0) + 1),
+        )
+      },
+    }
+    const subscription = agent.subscribe(subscriber)
+    return () => subscription.unsubscribe()
+  }, [agent])
+
   const approvalRuntime = useMemo<ApprovalRuntime>(
     () => ({
       respondToToolApproval: (options) => {
@@ -103,7 +184,9 @@ export function AgUiRuntimeProvider({
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <ApprovalRuntimeContext.Provider value={approvalRuntime}>
-        {children}
+        <TokenUsageContext.Provider value={tokenUsage}>
+          {children}
+        </TokenUsageContext.Provider>
       </ApprovalRuntimeContext.Provider>
     </AssistantRuntimeProvider>
   )
