@@ -183,6 +183,14 @@ hidden: false                              # 可选
 - 子智能体声明是**配置性质**，已加入 `.gitignore` 豁免（与 `AGENTS.md` / `knowledge/` 同级），随版本控制。
 - 运行中的后端不会热加载新声明的子智能体（agent 是启动期构建的），新增/修改后需重启才会生效。
 
+**派发机制（2026-10-12 真实模型端到端验证）**：子智能体并非以独立工具名（如 `code_review`）注入主 agent 的静态工具集，
+而是经 `DynamicSubagentsMiddleware` 挂到主 agent，由**统一的 `agent_spawn` 工具**派发——主 agent 调用
+`agent_spawn` 并传 `agent_id`（子智能体名）+ `task`（委派任务），`SubAgentTool.callAsync` 内部执行子智能体的
+对话并把最终回复回灌给主 agent。因此：
+
+- 启动日志里看不到 `code-review` 这类工具，只看到 `subagents=true` 与标准 `agent_spawn` 工具，是**正常现象**（subagent 是动态 middleware，不走静态 Toolkit 注册日志）。
+- `agent_spawn` 属高风险写操作，会被权限引擎拦截为 `permission_confirm`（`interruptKind`）回到前端 HITL 审批——**`accept-edits` / `explore` 权限模式不会自动放行 subagent 派发**，需要用户点「允许」才真正执行。
+
 ### 3.3 技能管理
 
 **目录约定**：`<agent workspace>/skills/<name>/SKILL.md`，由官方仓库扫描发现，运行期新建目录**即时可见**（无需重启）。
