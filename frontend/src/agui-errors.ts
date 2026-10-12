@@ -13,8 +13,11 @@
  * </ul>
  *
  * <p>两者都是「这条会话在服务端已经不可继续」的同一种处境，客户端能做的只有给出出路
- * （新建会话）。这类判定放在纯函数里，便于在无浏览器环境下直接断言，见
- * `scripts/agui-pipeline-check.ts`。
+ * （新建会话）。为什么不做「resume 入口」：官方 resume（`AguiResume` /
+ * `AguiResumeCoordinator`）的 `interruptId` 只在单次运行内存态，不落盘、后端重启即丢，
+ * 跨刷新/跨重启场景前端根本拿不到 id 去 resume；正常审批闭环已由
+ * `respondToToolApproval` 覆盖。见 `docs/roadmap.md` N-6。这类判定放在纯函数里，便于
+ * 在无浏览器环境下直接断言，见 `scripts/agui-pipeline-check.ts`。
  */
 export type AguiFailure = {
   /** 归类标识。 */
