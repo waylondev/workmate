@@ -49,6 +49,8 @@ export type AgentMeta = {
   description: string
   /** 是否已注册到 AG-UI 路由（`/agui/run/{id}`）。注销可由 registerAgent 恢复。 */
   registered: boolean
+  /** 权限模式（如 `default` / `accept-edits` / `explore`），展示层映射为中文标签。 */
+  permission: string
 }
 
 export async function listAgents(): Promise<AgentMeta[]> {

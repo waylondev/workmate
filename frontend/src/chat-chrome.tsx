@@ -5,11 +5,14 @@
 // thread.aui.tsx 因此保持可用且不依赖本文件。
 
 import { createContext, useContext, type ReactNode } from "react"
+import type { AgentInfo } from "@/agents"
 
 /** 右侧摘要面板中可被定位的段落。 */
 export type PanelSection = "progress" | "artifacts" | "jobs" | "skills" | "files"
 
 export type ChatChrome = {
+  /** 后端 `workmate.agents` 的实时目录（供切换器与欢迎页展示）。 */
+  agents: AgentInfo[]
   /** 当前会话使用的 agent（决定 `/agui/run/{id}`）。 */
   agentId: string
   onAgentChange: (agentId: string) => void

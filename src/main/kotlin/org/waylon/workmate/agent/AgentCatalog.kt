@@ -3,6 +3,7 @@ package org.waylon.workmate.agent
 import io.agentscope.core.agui.registry.AguiAgentRegistry
 import io.agentscope.core.model.Model
 import io.agentscope.core.permission.AdditionalWorkingDirectory
+import io.agentscope.core.permission.PermissionMode
 import io.agentscope.core.permission.PermissionContextState
 import io.agentscope.harness.agent.HarnessAgent
 import org.springframework.beans.factory.DisposableBean
@@ -24,6 +25,10 @@ class AgentCatalog(
 
 	val agents: Map<String, HarnessAgent> =
 		properties.agents.mapValues { (id, config) -> build(id, config, model) }
+
+	/** agent id → 权限模式。供管理面展示，避免把「权限」硬编码在前端。 */
+	val permissionModes: Map<String, PermissionMode> =
+		properties.agents.mapValues { (_, config) -> config.permissionMode }
 
 	/** 把全部 agent 注册进 AG-UI 注册表（启动期调用）。 */
 	fun registerAll(registry: AguiAgentRegistry) =

@@ -57,6 +57,7 @@ class AgentAdminController(
 			name = agent.name,
 			description = agent.description ?: "",
 			registered = registry.hasAgent(agentId),
+			permission = catalog.permissionModes[agentId]?.value ?: "",
 		)
 	}
 }
@@ -67,4 +68,6 @@ data class AgentView(
 	val name: String,
 	val description: String,
 	val registered: Boolean,
+	/** 权限模式（`PermissionMode.getValue()`，如 `default` / `accept-edits` / `explore`）。 */
+	val permission: String,
 )

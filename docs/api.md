@@ -33,7 +33,7 @@
 
 | 方法 | 路径 | 说明 | 成功 |
 |---|---|---|---|
-| GET | `/api/agents` | 列表：`id` / `name` / `description` / `registered` | 200 |
+| GET | `/api/agents` | 列表：`id` / `name` / `description` / `registered` / `permission` | 200 |
 | DELETE | `/api/agents/{id}` | 注销（可逆，未知 id → 404） | 200 |
 | POST | `/api/agents/{id}/register` | 重新注册（未知 id → 404） | 200 |
 

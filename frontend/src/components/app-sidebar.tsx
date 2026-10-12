@@ -1,4 +1,4 @@
-import { AGENTS } from "@/agents"
+import type { AgentInfo } from "@/agents"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { TooltipIconButton } from "@/components/tooltip-icon-button"
 import { cn } from "@/lib/utils"
@@ -27,6 +27,7 @@ import type { ReactNode } from "react"
 export function AppSidebar({
   nav,
   onNav,
+  agents,
   sessions,
   currentThreadId,
   agentId,
@@ -38,6 +39,7 @@ export function AppSidebar({
 }: {
   nav: NavKey
   onNav: (key: NavKey) => void
+  agents: AgentInfo[]
   sessions: ChatSession[]
   currentThreadId: string
   agentId: string
@@ -90,7 +92,7 @@ export function AppSidebar({
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         <SidebarSectionLabel>工作区</SidebarSectionLabel>
         <ul className="flex flex-col gap-0.5">
-          {AGENTS.map((agent) => {
+          {agents.map((agent) => {
             const active = nav === "chat" && agent.id === agentId
             return (
               <li key={agent.id}>

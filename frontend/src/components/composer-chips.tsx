@@ -1,4 +1,4 @@
-import { agentById, AGENTS } from "@/agents"
+import { agentById, permissionLabel } from "@/agents"
 import { useChatChrome } from "@/chat-chrome"
 import { cn } from "@/lib/utils"
 import {
@@ -22,12 +22,16 @@ export function ComposerChips() {
   const chrome = useChatChrome()
   if (!chrome) return null
 
-  const agent = agentById(chrome.agentId)
+  const agent = agentById(chrome.agents, chrome.agentId)
 
   return (
     <div className="aui-composer-chips flex min-w-0 items-center gap-1.5">
       <AgentChip agentId={chrome.agentId} onSelect={chrome.onAgentChange} />
-      <Chip icon={<ShieldIcon className="size-3" />} label={agent.permission} title="权限模式（由 agent 配置决定）" />
+      <Chip
+        icon={<ShieldIcon className="size-3" />}
+        label={agent ? permissionLabel(agent.permission) : ""}
+        title="权限模式（由 agent 配置决定）"
+      />
       <Chip
         icon={<WrenchIcon className="size-3" />}
         label="技能"
@@ -72,9 +76,11 @@ function Chip({
 }
 
 function AgentChip({ agentId, onSelect }: { agentId: string; onSelect: (agentId: string) => void }) {
+  const chrome = useChatChrome()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const agent = agentById(agentId)
+  const agent = chrome ? agentById(chrome.agents, agentId) : undefined
+  const agents = chrome?.agents ?? []
 
   useEffect(() => {
     if (!open) return
@@ -103,7 +109,7 @@ function AgentChip({ agentId, onSelect }: { agentId: string; onSelect: (agentId:
         className="border-border/70 text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] transition-colors"
       >
         <FolderIcon className="size-3" />
-        <span className="max-w-20 truncate">{agent.name}</span>
+        <span className="max-w-20 truncate">{agent?.name ?? ""}</span>
         <ChevronDownIcon className="size-3" />
       </button>
 
@@ -112,7 +118,7 @@ function AgentChip({ agentId, onSelect }: { agentId: string; onSelect: (agentId:
           role="menu"
           className="glass bg-popover/90 text-popover-foreground absolute bottom-full left-0 z-50 mb-1.5 w-60 rounded-xl border p-1 shadow-xl"
         >
-          {AGENTS.map((item) => (
+          {agents.map((item) => (
             <button
               key={item.id}
               type="button"

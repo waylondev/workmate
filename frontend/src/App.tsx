@@ -1,9 +1,9 @@
 import { AgUiRuntimeProvider } from "@/ag-ui-runtime-provider"
 import { classifyAguiFailure, type AguiFailure } from "@/agui-errors"
-import { ApiError, deleteSession as deleteSessionApi } from "@/api"
-import { AGENTS, agentById } from "@/agents"
+import { ApiError, deleteSession as deleteSessionApi, listAgents } from "@/api"
+import { agentById, toAgentInfo, type AgentInfo } from "@/agents"
 import { AdminPanel } from "@/AdminPanel"
-import { ChatChromeProvider, type ChatChrome, type PanelSection } from "@/chat-chrome"
+import { ChatChromeProvider, type ChatChrome, type PanelSection, useChatChrome } from "@/chat-chrome"
 import { ApprovalBanner } from "@/components/approval-banner"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ConversationSummaryPanel } from "@/components/conversation-summary-panel"
@@ -30,7 +30,9 @@ import { useCallback, useEffect, useMemo, useState } from "react"
  * 因此「工作进度」直接来自真实 SSE 事件，而不是另建一套状态。
  */
 export default function App() {
-  const [agentId, setAgentId] = useState(AGENTS[0].id)
+  /** 后端 `workmate.agents` 的实时目录；拉取前为空，渲染层需容忍空态。 */
+  const [agents, setAgents] = useState<AgentInfo[]>([])
+  const [agentId, setAgentId] = useState<string>("")
   const [nav, setNav] = useState<NavKey>("chat")
   const [sessions, setSessions] = useState<ChatSession[]>(() => loadSessions())
   const [threadId, setThreadId] = useState<string>(() => {
@@ -43,6 +45,25 @@ export default function App() {
   const [failure, setFailure] = useState<AguiFailure | null>(null)
   /** 本会话内「自动批准」开关：开启后新出现的工具授权自动放行（内存态，不落盘）。 */
   const [allowAll, setAllowAll] = useState(false)
+
+  // 启动拉取 agent 目录；首项作为默认 agent。
+  useEffect(() => {
+    let cancelled = false
+    listAgents()
+      .then((metas) => {
+        if (cancelled) return
+        const infos = metas.map(toAgentInfo)
+        setAgents(infos)
+        if (infos.length > 0) setAgentId((current) => current || infos[0].id)
+      })
+      .catch((error) => {
+        // 后端不可达时保留空列表，聊天壳仍可渲染，但 agent 切换/权限 chip 会缺省。
+        console.warn("拉取 agent 目录失败", error)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     persistSessions(sessions)
@@ -156,12 +177,13 @@ export default function App() {
 
   const chrome = useMemo<ChatChrome>(
     () => ({
+      agents,
       agentId: activeAgentId,
       onAgentChange: handleAgentChange,
       revealPanel,
       onNav: (key) => setNav(key),
     }),
-    [activeAgentId, handleAgentChange, revealPanel],
+    [agents, activeAgentId, handleAgentChange, revealPanel],
   )
 
   return (
@@ -171,6 +193,7 @@ export default function App() {
           <AppSidebar
             nav={nav}
             onNav={setNav}
+            agents={agents}
             sessions={sessions}
             currentThreadId={threadId}
             agentId={activeAgentId}
@@ -196,7 +219,7 @@ export default function App() {
                 <div className="flex min-w-0 flex-1 flex-col">
                   <ChatHeader
                     title={currentSession?.title ?? UNTITLED}
-                    agentName={agentById(activeAgentId).name}
+                    agentName={agentById(agents, activeAgentId)?.name ?? ""}
                     sidebarOpen={sidebarOpen}
                     panelOpen={panelOpen}
                     onToggleSidebar={() => setSidebarOpen((open) => !open)}
@@ -403,7 +426,9 @@ function SessionTitler({
 }
 
 function Welcome({ agentId }: { agentId: string }) {
-  const agent = agentById(agentId)
+  const chrome = useChatChrome()
+  const agent = chrome ? agentById(chrome.agents, agentId) : undefined
+  if (!agent) return null
   return (
     <div className="aui-thread-welcome-root fade-in slide-in-from-bottom-1 animate-in fill-mode-both mb-8 flex flex-col items-center px-4 text-center duration-200">
       <div className="text-primary-foreground btn-brand mb-4 flex size-12 items-center justify-center rounded-2xl shadow-[0_0_30px_-6px_var(--color-brand-violet)]">

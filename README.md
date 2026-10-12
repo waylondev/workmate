@@ -78,7 +78,7 @@ AgentScope 相关依赖（`io.agentscope:2.0.4`）：
 - **锚点联动**：输入区的 `ComposerChips`（agent / 权限 / 技能 / 工作进度 chip）经 `ChatChrome.revealPanel(section)` 展开右栏并滚动到 `#summary-{section}`。
 - **工具授权**：工具需授权时，中栏顶部弹出 `ApprovalBanner`（醒目横幅，列出待确认工具），可直接「允许 / 全部允许 / 拒绝」，并可勾选「本会话内自动批准」。待授权项由 `src/approvals.ts` 的纯函数从消息树派生，批准经 `ag-ui-runtime-provider.tsx` 暴露的 `respondToToolApproval` 回传后端。工具卡在 `requires-action` 态收起时即高亮（琥珀色边框 + 「待授权」徽章）。
 - **会话目录在前端**：`src/sessions.ts` 用 localStorage 维护 `threadId → { agentId, title, updatedAt }`，首条用户消息自动生成标题。真正的对话转录由后端 SessionTree 落盘，侧栏「移除」会调用 `DELETE /api/agents/{id}/sessions/{threadId}` **真删**服务端转录目录（不可逆）。
-- `src/agents.ts` 是前端的 agent 目录（与后端 `workmate.agents` 一一对应），左栏「工作区」段与输入区 chip 都可切换 `default / coder / explorer`；切换时以 `key` 重挂载运行时，每个 agent 是一段独立会话。
+- `src/agents.ts` 是前端的 agent **类型与展示映射**：agent 目录不再硬编码，由 `GET /api/agents` 动态拉取（权威来源是后端 `workmate.agents`）。左栏「工作区」段与输入区 chip 都从这份动态列表渲染，切换时以 `key` 重挂载运行时，每个 agent 是一段独立会话；权限模式的中文标签（需审批/自动放行/只读）由 `permissionLabel()` 做纯展示映射。
 
 ## 目录结构
 
@@ -111,7 +111,7 @@ workmate/
 │   ├── src/ag-ui-runtime-provider.tsx  # AG-UI 运行时接入 + 审批能力上下文
 │   ├── src/agui-sse.ts                 # SSE 包装：剔除 expiresAt:null 再交运行时解析
 │   ├── src/agui-errors.ts              # 运行失败归类（会话卡在待授权 → 出路）
-│   ├── src/agents.ts                   # 前端 agent 目录（含 permission 展示）
+│   ├── src/agents.ts                   # agent 类型 + 权限中文标签映射（目录由 /api/agents 动态拉取）
 │   ├── src/approvals.ts                # 待授权项派生（纯函数，横幅数据源）
 │   ├── src/thread-types.ts             # 线程消息共享类型（work-progress / approvals 共用）
 │   ├── src/api.ts                      # /api/* 封装（RFC 7807 → ApiError）
@@ -273,7 +273,7 @@ RUN_STARTED → REASONING_MESSAGE_* → TOOL_CALL_START → TOOL_CALL_ARGS ×3 �
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/agents` | agent 列表：`id` / `name` / `description` / `registered` |
+| GET | `/api/agents` | agent 列表：`id` / `name` / `description` / `registered` / `permission` |
 | DELETE | `/api/agents/{id}` | 从 AG-UI 注册表注销（可逆） |
 | POST | `/api/agents/{id}/register` | 重新注册（与注销成对，避免不可逆操作） |
 | GET | `/api/agents/{id}/skills` | 该 agent 的技能及来源仓库（`repositories` / `writable` / `deletable`） |
