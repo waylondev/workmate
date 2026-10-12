@@ -24,7 +24,16 @@
 6. **不可变优先**：`val`、`data class`、不可变集合；状态变化通过返回新值而非原地修改。
 7. **禁止**：字段注入（`@Autowired` 字段）、`!!` 强制解包、`as?` 之外的裸强转、全局可变状态、滥用 `lateinit`、为模式而模式。
 
-## 三、Kotlin 规范
+## 三、前端 UI 规范
+
+- 视觉令牌**唯一来源**是 `frontend/src/index.css`（语义色 + 品牌色 + 阴影/发光令牌）。新增视觉值一律进令牌，
+  禁止在组件里写 `shadow-[…]` / `bg-[#…]` 等 magic string。
+- **零新增依赖**：图标用 `lucide-react`，动画用 Tailwind `animate-in` / `tw-shimmer`，组件复用
+  `ui/` + `assistant-ui` primitive。确需新库 → 先写 ADR 并暂停确认。
+- 所有动画带 `motion-reduce:animate-none`；图标按钮必须有 `aria-label`；交互元素用真实 `<button>`。
+- 视觉细节与已落地资产见 `docs/ui-guidelines.md`（前端视觉唯一权威）。
+
+## 四、Kotlin 规范
 
 - 优先 `val`，确需可变才 `var`。
 - 数据传输用 `data class`；穷举状态用 `sealed class` / `sealed interface`。
@@ -85,7 +94,7 @@
 5. **汇报**：按「阶段汇报」模板输出变更文件、行为变化、测试结果、风险与下一步。
 6. **无未批准依赖**：未新增依赖，或已通过 ADR 确认。
 
-## 九、验证与取证约定
+## 十、验证与取证约定
 
 - 后端无法直接跑 Gradle 时，用已构建产物 `java -jar build/libs/*.jar` 联调（见 `docs/architecture.md` 环境节）。
 - 调用第三方 jar API 前，用 `javap -p -c` 反编译确认真实签名，禁止凭猜测写 API 名。
