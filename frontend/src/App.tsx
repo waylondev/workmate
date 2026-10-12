@@ -431,13 +431,23 @@ function Welcome({ agentId }: { agentId: string }) {
   if (!agent) return null
   return (
     <div className="aui-thread-welcome-root fade-in slide-in-from-bottom-1 animate-in fill-mode-both mb-8 flex flex-col items-center px-4 text-center duration-200">
-      <div className="text-primary-foreground btn-brand mb-4 flex size-12 items-center justify-center rounded-2xl shadow-glow-lg">
-        <SparklesIcon className="size-6" />
+      <div className="relative mb-5">
+        <div
+          aria-hidden
+          className="absolute -inset-3 rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklab,var(--color-brand-violet)_22%,transparent),transparent)]"
+        />
+        <div className="text-primary-foreground btn-brand relative flex size-14 items-center justify-center rounded-2xl shadow-glow-md">
+          <SparklesIcon className="size-7" />
+        </div>
       </div>
       <h1 className="text-gradient text-3xl font-semibold tracking-tight text-balance">
         {agent.name}
       </h1>
-      <p className="text-muted-foreground mt-2.5 max-w-md text-[15px] leading-relaxed text-pretty">
+      <div
+        aria-hidden
+        className="from-brand-cyan/60 to-brand-violet/60 mt-4 h-px w-16 bg-gradient-to-r to-transparent"
+      />
+      <p className="text-muted-foreground/80 mt-4 max-w-md text-sm leading-relaxed text-pretty">
         {agent.description}。目标即服务，context is all you need。
       </p>
     </div>
