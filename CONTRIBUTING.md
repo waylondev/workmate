@@ -32,7 +32,7 @@
 cd frontend && pnpm check:ui && pnpm check:agui && pnpm lint && pnpm build
 ```
 
-改动涉及后端功能 / 前端交互时，按 `docs/regression-checklist.md` 端到端重跑一遍（三端健康、Agent、定时任务、AG-UI SSE、子智能体派发），记录真实结果。
+改动涉及后端功能 / 前端交互时，跑一键回归脚本（快速 `bash scripts/regression/run.sh`，完整 `--full`），或按 `docs/regression-checklist.md` 人肉重跑一遍。测试分层与判绿标准见 `docs/testing-guide.md`，能力覆盖台账见 `docs/feature-inventory.md`。
 
 ## 完成定义
 

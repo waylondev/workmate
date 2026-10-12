@@ -13,14 +13,15 @@ JAVA_HOME="D:/Users/Administrator/.jdks/jdk-25.0.4.1+1" ./gradlew compileKotlin
 
 # 前端类型 + 构建 + 结构校验 + 审批管线校验 + lint
 cd frontend
-node node_modules/typescript/bin/tsc --noEmit
-node node_modules/npm/bin/npm-cli.js run build
-node node_modules/npm/bin/npm-cli.js run check:ui
-node node_modules/npm/bin/npm-cli.js run check:agui
-node node_modules/npm/bin/npm-cli.js run lint
+npm run build
+npm run check:ui
+npm run check:agui
+npm run lint
 ```
 
-> Windows 下 `npm` / `.bin/vite` 不能用 node 直跑 shell 脚本，统一走 `node node_modules/npm/bin/npm-cli.js run <script>`。
+> Windows 下直接 `npm run <script>`（`npm` 是 PATH 里的可执行脚本）。
+> 不要用 `node node_modules/npm/bin/npm-cli.js run ...`——本机 node 22 内嵌 npm，没有独立 `npm-cli.js`，会 `MODULE_NOT_FOUND`。
+> 类型检查若需单独跑：`npx tsc --noEmit`。
 
 ## 1. 三端健康
 
