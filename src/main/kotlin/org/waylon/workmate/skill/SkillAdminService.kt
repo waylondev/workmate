@@ -27,8 +27,12 @@ import org.springframework.stereotype.Service
  * 还原是为了不改变 agent 运行时的默认保护姿态。
  *
  * <h2>删除语义</h2>
- * - `WorkspaceSkillRepository`：**归档**到 `skills/.archive/<name>-<ts>`（可恢复），优先选用
+ * - `WorkspaceSkillRepository`：**归档**到 `skills/.archive/<name>-<ts>`，优先选用
  * - `FileSystemSkillRepository`：**硬删除**，仅在上面那个仓库不包含该技能时回退使用
+ *
+ * <p>注意：官方 `AgentSkillRepository` 只有 `save`/`delete`，**没有恢复（unarchive）也没有启停
+ * 开关**；`delete()` 内部用「move 到 `.archive/`」只是避免直接删除的兜底，并非承诺可逆。
+ * 因此本项目**不提供**技能恢复接口——删除即不可逆，前端应如实提示。
  *
  * <p>响应如实回传 `archived`，避免接口文档与真实行为不一致。
  */
@@ -99,7 +103,7 @@ class SkillAdminService(
 
 	/**
 	 * 选出实际执行删除的仓库：
-	 * 1. 归档语义的 workspace 仓库优先（可恢复，管理面默认更安全）
+	 * 1. 归档语义的 workspace 仓库优先
 	 * 2. 其次任意声明可写的仓库（硬删除）
 	 * 3. 都没有 → null（无法删除）
 	 */
@@ -146,6 +150,6 @@ data class SkillDeletion(
 	val deleted: Boolean,
 	/** 实际执行删除的仓库 source。 */
 	val repository: String,
-	/** true=已归档到 `.archive/`（可恢复）；false=硬删除。 */
+	/** true=已归档到 `.archive/`（官方 delete 的兜底，非承诺可恢复）；false=硬删除。 */
 	val archived: Boolean,
 )
