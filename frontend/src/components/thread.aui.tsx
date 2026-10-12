@@ -472,7 +472,7 @@ const ThreadSuggestionItem: FC = () => {
 const Composer: FC<{ autoFocus: boolean }> = ({ autoFocus }) => {
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
-      <ComposerPrimitive.AttachmentDropzone render={<div data-slot="aui_composer-shell" className="border-foreground/10 focus-within:border-foreground/25 data-[dragging=true]:border-ring flex w-full cursor-text flex-col gap-2 rounded-(--composer-radius) border bg-(--composer-bg) p-(--composer-padding) transition-[border-color] data-[dragging=true]:border-dashed data-[dragging=true]:bg-[color-mix(in_oklab,var(--color-accent)_50%,var(--color-background))]" />}><ComposerAttachments /><ComposerPrimitive.Input
+      <ComposerPrimitive.AttachmentDropzone render={<div data-slot="aui_composer-shell" className="border-border/70 focus-within:border-[color-mix(in_oklab,var(--color-brand-cyan)_45%,var(--color-border))] focus-within:shadow-[0_0_0_1px_color-mix(in_oklab,var(--color-brand-cyan)_28%,transparent),0_0_24px_-8px_color-mix(in_oklab,var(--color-brand-violet)_35%,transparent)] data-[dragging=true]:border-ring flex w-full cursor-text flex-col gap-2 rounded-(--composer-radius) border bg-(--composer-bg) p-(--composer-padding) transition-[border-color,box-shadow] duration-200 data-[dragging=true]:border-dashed data-[dragging=true]:bg-[color-mix(in_oklab,var(--color-accent)_50%,var(--color-background))]" />}><ComposerAttachments /><ComposerPrimitive.Input
                       placeholder="发消息或创建任务…"
                       className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none"
                       rows={1}
@@ -757,7 +757,7 @@ const EditComposer: FC = () => {
       data-slot="aui_edit-composer-wrapper"
       className="flex flex-col px-2 [contain-intrinsic-size:auto_200px] [content-visibility:auto]"
     >
-      <ComposerPrimitive.Root className="aui-edit-composer-root border-foreground/10 focus-within:border-foreground/25 ms-auto flex w-full max-w-[85%] cursor-text flex-col rounded-(--composer-radius) border bg-(--composer-bg) transition-[border-color]">
+      <ComposerPrimitive.Root className="aui-edit-composer-root border-border/70 focus-within:border-[color-mix(in_oklab,var(--color-brand-cyan)_45%,var(--color-border))] focus-within:shadow-[0_0_0_1px_color-mix(in_oklab,var(--color-brand-cyan)_28%,transparent)] ms-auto flex w-full max-w-[85%] cursor-text flex-col rounded-(--composer-radius) border bg-(--composer-bg) transition-[border-color,box-shadow] duration-200">
         <ComposerPrimitive.Input
           className="aui-edit-composer-input text-foreground min-h-14 w-full resize-none bg-transparent px-4 pt-3 pb-1 text-base outline-none"
           autoFocus
