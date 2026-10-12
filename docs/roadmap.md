@@ -32,6 +32,7 @@
 |---|---|---|
 | P1-1 | ~~服务端会话列表 / 删除~~ | ✅ 已实现（`SessionAdminService` 直删 `workspace/{threadId}/` 目录） |
 | P1-2 | ~~Agent 定义热加载~~ | ✅ 已撤销，移入 N-7（官方无 reload API，且已被 subagent 机制替代） |
+| P1-3 | MCP 连接器运行时管理 + 前端配置面板 | 待做：声明式 `tools-config.mcp-servers` 需重启才生效；复用官方 `McpClientManager.registerMcpClient/removeMcpClient/getMcpClientNames` 暴露 `GET/POST/DELETE /api/agents/{id}/mcp` + Agent 管理面板内 per-agent 配置入口，不引新依赖（见 `design.md` §3.3.2） |
 
 ### P2 — 锦上添花
 

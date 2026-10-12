@@ -4,7 +4,7 @@
 > 逐项结果见 `docs/verification-report.md`。
 >
 > 与 `README.md` 的分工：README 讲「怎么跑」，本文讲「为什么这么设计、边界在哪」。
-> 高层架构见 `architecture.md`，技术决策（ADR）见 `adr/`，API 契约见 `api.md`，
+> 高层架构见 `architecture.md`，技术决策（ADR）见 `docs/adr/`，API 契约见 `api.md`，
 > 待做清单见 `roadmap.md`。
 >
 > 原则：**不引入数据库**，存储完全基于 AgentScope 官方能力，只在官方「积木」之上搭薄层。
@@ -60,7 +60,7 @@
 
 | 目标功能 | 实现 |
 |---|---|
-| **会话** | 前端本地会话目录（localStorage）+ 后端 `SessionTree` 转录落盘；支持多轮上下文复用 |
+| **会话** | 前端本地会话目录（localStorage）+ 后端 `SessionTree` 转录落盘（真相来源）；服务端 `GET/DELETE /api/agents/{id}/sessions` 列表 / 真删（P1-1）|
 | **Agent 专家管理** | `GET /api/agents` 列表（定义 + 注册态）/ `DELETE` 注销 / `POST /register` 恢复 |
 | **技能管理** | `GET /api/agents/{id}/skills` 列出（含来源仓库与可写性）/ `DELETE` 归档删除 |
 | **子智能体** | 官方从 `workspace/subagents/*.md` 自动装配，无需自定义代码（见 §3.2.1） |
@@ -133,9 +133,14 @@
 
 > 反证：另起一个实例加 `--agentscope.agui.server-side-memory=true`，同一次调用后池立即填充为 `activeSessions:1` 且字段齐全。所以空池由配置决定，不是 bug。
 
-**决策**：删除 `SessionController`，前端同步移除那座 fire-and-forget 的 `DELETE` 调用。侧栏动作语义改为「从最近列表移除（服务端转录保留）」，文案如实描述行为。
+**决策（演进）**：早期暴露的 `GET /api/sessions` 读的是官方内存会话池（`server-side-memory`），是结构性死胡同，已删除（见 §技术决策 3）。但「服务端会话列表 / 删除」作为**真实管理需求**已被 **P1-1** 重新实现 —— 不读内存池，而是直接读 `SessionTree` 的转录落盘目录（那才是真相），即 `SessionAdminService` + `SessionController`：
 
-> 若未来确实需要服务端会话列表 / 删除，正确做法是**读 `SessionTree` 的转录与 `sessions.json` 索引**（那才是真相），而不是打开 `server-side-memory` 再读内存池。属新增功能，需单独定夺。
+- `GET /api/agents/{id}/sessions` 列出某 agent 的全部真实会话（来自 `{workspace}/{threadId}/` 转录目录）；
+- `DELETE /api/agents/{id}/sessions/{sessionId}` **真删整个落盘目录**（不可逆，前端如实提示）。
+
+端点契约见 `api.md` §会话管理，实测证据见 `verified-capabilities.md` §五。前端侧栏「移除会话」改为异步真删（`deleteSession`），404 静默降级仍移本地。
+
+> 关键认知：官方**没有**「列出全部会话 / 删除会话」的管理面 API（`WorkspaceManager.listSessionLogFiles` 是命名空间相关的运行时 API，不适合管理面）。管理需求只能按「本项目契约的目录结构」删，不能硬套官方运行时 API —— 这正是 P1-1 的做法。
 
 **多轮上下文复用**：前端 `AgUiRuntimeProvider` 的 `threadId` 由外部传入（不再是 `crypto.randomUUID()`），切换会话即切换 `threadId`，后端按 `(userId, sessionId)` 隔离状态并追加转录。
 
@@ -236,6 +241,28 @@ hidden: false                              # 可选
 - 官方 `autoPromote=false`：即使开了 manage tool，agent 创建的是**草稿**（落 `skills/_drafts`），不会自动转正；转正需 `promotionGate` 审批（官方 `enableSkillPromotionGate`，本项目**未接**，故草稿保持草稿态）。
 - 官方 curator `umbrellaPassMode=DRY_RUN_ONLY`：策展默认**只演练出报告**，不实际 stale/archive，需显式改 mode 才真正迁移。
 - 本项目的 `GET /api/agents/{id}/skills` 列出的是 `skills/` 主目录下的正式技能；草稿在 `skills/_drafts`，不在该列表内（如需暴露草稿，属新增功能，需单独定夺）。
+
+### 3.3.2 连接器（MCP）声明式接入
+
+官方 `HarnessAgent$Builder.toolsConfig(ToolsConfig)` 接收 `ToolsConfig`，其 `mcpServers: Map<String, McpServerConfig>` 即「连接器」声明。每个 entry 是一个外部 MCP server，由 `transport` 区分接入方式：
+
+| transport | 声明字段 | 说明 |
+|---|---|---|
+| `stdio` | `command` / `args` / `env` | 本地进程式 MCP（如文件系统 / 数据库工具） |
+| `sse` | `url` / `headers` | SSE 长连式远程 MCP |
+| `streamableHttp` | `url` / `headers` / `queryParams` | Streamable HTTP 式远程 MCP |
+
+交给 `toolsConfig(...)` 后，官方 `McpServerRegistrar.register(toolkit, mcpServers)` 按 transport **自动** `McpClientBuilder.buildSync()` + 注册进该 agent 的 `ownedMcpToolkit`，**无需手动 new 任何组件**。
+
+**关键事实（反编译确证）**：
+
+- MCP 是 **per-agent** 的：`HarnessAgent` 持有 `private final Toolkit ownedMcpToolkit`，注册目标是传入的 toolkit，非全局共享；多个 agent 各配各的、互不干扰。
+- `McpServerConfig` 是纯 JavaBean（无 Builder）：`transport` / `command` / `args` / `env` / `url` / `headers` / `queryParams` / `enableTools` / `disableTools` / `timeout` / `required` / `prefixToolNames` / `defaultToolsEnabled`。
+- 本项目只声明 `toolsConfig: ToolsConfig?`（Spring 绑定 yaml 的 `tools-config.mcp-servers`），经 `AgentCatalog.build()` 的 `configureTools(config)` 传入官方 `toolsConfig(...)`，**零自造适配层**（见 `agent/AgentCatalog.kt`）。
+
+**当前边界（必须知道）**：接入方式是**声明式、静态**的 —— 修改 `application.yaml` 的 `tools-config.mcp-servers` 后**需重启后端**才生效。官方 `McpServerRegistrar` 也提供运行期 `McpClientManager.registerMcpClient` / `removeMcpClient` / `getMcpClientNames`，但本项目**尚未暴露**对应的运行时管理端点（`GET/POST/DELETE /api/agents/{id}/mcp`）与前端配置入口，属计划中的下一步（见 `roadmap.md` P1-3），复用官方 `McpClientManager` 即可、不引新依赖。
+
+对应配置项：`workmate.agents.<id>.tools-config.mcp-servers`（Map，默认空，见 `application.yaml` 注释示例）。
 
 ### 3.4 定时任务
 
@@ -340,7 +367,7 @@ Quartz，创建/取消时同步写回。落盘失败只记日志、不阻断已�
 | P4 | 定时任务（cron 创建 / 列表 / 取消，真实触发已验证） | ✅ 已实测 |
 | P4.1 | 定时任务定义持久化（落盘 + 重启恢复） | ✅ 已实测 |
 | P5 | 三栏前端外壳（左栏 / 中栏 / 右栏工作进度） | ✅ 已构建 + SSR 校验 |
-| — | 服务端会话列表与删除 | ⬜ 未做（见 §3.1） |
+| P1-1 | 服务端会话列表 / 删除 | ✅ 已实测（见 §3.1）|
 
 ## 5. 官方 API 核销
 
