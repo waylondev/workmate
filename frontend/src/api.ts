@@ -120,10 +120,6 @@ export type SessionDeletion = {
   removedFiles: number
 }
 
-export async function listSessions(agentId: string): Promise<SessionMeta[]> {
-  return json<SessionMeta[]>(`${BASE}/agents/${agentId}/sessions`)
-}
-
 export async function deleteSession(
   agentId: string,
   sessionId: string,
