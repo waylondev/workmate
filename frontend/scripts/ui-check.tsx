@@ -47,7 +47,7 @@ try {
   const expected = [
     "Workmate",
     "新建对话",
-    "工作区",
+    "Agent 管理",
     "最近",
     "本地用户",
     "对话摘要",
@@ -61,7 +61,7 @@ try {
   const { writeFileSync } = await import("node:fs")
   writeFileSync(".ui-check/render.html", html)
   check("SSR 渲染三栏外壳", html.length > 2000, `html=${html.length}B`)
-  check("三栏顺序：侧栏 → 中栏 → 摘要面板", html.indexOf("工作区") < html.indexOf("aui-composer") && html.indexOf("aui-composer") < html.indexOf("summary-progress"), "")
+  check("三栏顺序：侧栏 → 中栏 → 摘要面板", html.indexOf("Agent 管理") < html.indexOf("aui-composer") && html.indexOf("aui-composer") < html.indexOf("summary-progress"), "")
   check("技能 chip 与进度锚点存在", html.includes("aui-composer-chips") && html.includes("summary-progress"), "")
   check("关键文案齐全", missing.length === 0, missing.length ? `缺失: ${missing.join(", ")}` : "")
   check("中栏顶栏存在", html.includes("发消息或创建任务") || html.includes("aui-composer"), "")

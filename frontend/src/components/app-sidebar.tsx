@@ -1,4 +1,3 @@
-import type { AgentInfo } from "@/agents"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { TooltipIconButton } from "@/components/tooltip-icon-button"
 import { cn } from "@/lib/utils"
@@ -6,10 +5,8 @@ import type { NavKey } from "@/nav"
 import type { ChatSession } from "@/sessions"
 import {
   BotIcon,
-  CheckIcon,
   ChevronRightIcon,
   ClockIcon,
-  FolderIcon,
   PanelLeftCloseIcon,
   SparklesIcon,
   SquarePenIcon,
@@ -19,34 +16,28 @@ import {
 import type { ReactNode } from "react"
 
 /**
- * 左侧栏：品牌 → 功能导航 → 工作区（agent）→ 最近（会话）→ 用户区。
+ * 左侧栏：品牌 → 功能导航 → 最近（会话）→ 用户区。
  *
- * <p>「工作区」段列的是后端 `workmate.agents` 声明的 agent；点击即切换当前会话使用的
- * agent（决定 `/agui/run/{id}`），与中栏输入区的 agent chip 是同一状态。
+ * <p>agent 切换不放在侧栏——中栏输入区的 agent chip（ComposerChips）已提供同一能力，
+ * 侧栏再放一份是重复入口。会话切换保留在「最近」段。
  */
 export function AppSidebar({
   nav,
   onNav,
-  agents,
   sessions,
   currentThreadId,
-  agentId,
   onNewChat,
   onSwitchSession,
   onDeleteSession,
-  onAgentChange,
   onCollapse,
 }: {
   nav: NavKey
   onNav: (key: NavKey) => void
-  agents: AgentInfo[]
   sessions: ChatSession[]
   currentThreadId: string
-  agentId: string
   onNewChat: () => void
   onSwitchSession: (threadId: string) => void
   onDeleteSession: (threadId: string) => void
-  onAgentChange: (agentId: string) => void
   onCollapse: () => void
 }) {
   const adminNav: { key: "jobs" | "skills" | "agents"; label: string; icon: ReactNode }[] = [
@@ -90,27 +81,6 @@ export function AppSidebar({
       </nav>
 
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        <SidebarSectionLabel>工作区</SidebarSectionLabel>
-        <ul className="flex flex-col gap-0.5">
-          {agents.map((agent) => {
-            const active = nav === "chat" && agent.id === agentId
-            return (
-              <li key={agent.id}>
-                <SidebarRow
-                  icon={<FolderIcon className="size-4" />}
-                  label={agent.name}
-                  title={agent.description}
-                  active={active}
-                  onClick={() => onAgentChange(agent.id)}
-                  trailing={
-                    active ? <CheckIcon className="text-muted-foreground size-3.5" /> : undefined
-                  }
-                />
-              </li>
-            )
-          })}
-        </ul>
-
         <SidebarSectionLabel>最近</SidebarSectionLabel>
         {sessions.length === 0 ? (
           <p className="text-muted-foreground px-2 py-1.5 text-xs">暂无会话</p>

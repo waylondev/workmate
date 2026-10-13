@@ -193,14 +193,11 @@ export default function App() {
           <AppSidebar
             nav={nav}
             onNav={setNav}
-            agents={agents}
             sessions={sessions}
             currentThreadId={threadId}
-            agentId={activeAgentId}
             onNewChat={createSession}
             onSwitchSession={switchSession}
             onDeleteSession={deleteSession}
-            onAgentChange={handleAgentChange}
             onCollapse={() => setSidebarOpen(false)}
           />
         )}
