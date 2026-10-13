@@ -121,8 +121,32 @@ check "POST .../register 恢复 registered=true" \
   "$( printf '%s' "$REG" | grep -q '"registered":true' && echo 1 || echo 0 )" "resp=$REG"
 
 # =====================================================================
+step "2b. 技能管理"
+# =====================================================================
+SK_LIST_HTTP="$(CURL -o /dev/null -w '%{http_code}' "$BACKEND_URL/api/agents/default/skills" 2>/dev/null)"
+check "GET /api/agents/default/skills → 200" \
+  "$( [ "$SK_LIST_HTTP" = "200" ] && echo 1 || echo 0 )" "code=$SK_LIST_HTTP"
+SK_LIST="$(CURL "$BACKEND_URL/api/agents/default/skills" 2>/dev/null)"
+check "GET /api/agents/default/skills 返回技能列表" \
+  "$( [ -n "$SK_LIST" ] && echo 1 || echo 0 )"
+
+SK_404="$(CURL -o /dev/null -w '%{http_code}' "$BACKEND_URL/api/agents/nope/skills" 2>/dev/null)"
+check "GET /api/agents/nope/skills → 404（agent 不存在）" \
+  "$( [ "$SK_404" = "404" ] && echo 1 || echo 0 )" "code=$SK_404"
+
+SK_DEL_404="$(CURL -o /dev/null -w '%{http_code}' -X DELETE "$BACKEND_URL/api/agents/default/skills/__nope__" 2>/dev/null)"
+check "DELETE /api/agents/default/skills/__nope__ → 404（技能不存在）" \
+  "$( [ "$SK_DEL_404" = "404" ] && echo 1 || echo 0 )" "code=$SK_DEL_404"
+
+# =====================================================================
 step "3. 定时任务（含执行历史）"
 # =====================================================================
+# 参数校验分支（不依赖模型，常驻快速回归）
+JOB_400="$(CURL -o /dev/null -w '%{http_code}' -X POST "$BACKEND_URL/api/jobs" \
+  -H 'Content-Type: application/json' -d '{}' 2>/dev/null)"
+check "POST /api/jobs 缺字段 {} → 400" \
+  "$( [ "$JOB_400" = "400" ] && echo 1 || echo 0 )" "code=$JOB_400"
+
 if [ "$FULL" -eq 1 ]; then
   JOB_NAME="regress-smoke"
   CREATE="$(CURL -X POST "$BACKEND_URL/api/jobs" \
@@ -172,6 +196,42 @@ if [ "$FULL" -eq 1 ]; then
   check "SSE 含 RUN_FINISHED" "$( printf '%s' "$SSE" | grep -q 'RUN_FINISHED' && echo 1 || echo 0 )"
 else
   skipped "AG-UI SSE 对话（需 --full）"
+fi
+
+# =====================================================================
+step "4b. 会话管理（列出 / 删除）"
+# =====================================================================
+if [ "$FULL" -eq 1 ]; then
+  # 造一个真实会话：用 default agent 跑一次 AG-UI，落盘 workspace/{threadId}
+  SESS_TID="regress-sess-$$-$(date +%s)"
+  CURL -N -m 60 "$BACKEND_URL/agui/run/default" \
+    -H 'Content-Type: application/json' -H 'Accept: text/event-stream' \
+    -d "{\"threadId\":\"$SESS_TID\",\"runId\":\"rs\",\"tools\":[],\"context\":[],\"forwardedProps\":{},\"state\":{},\"messages\":[{\"id\":\"m1\",\"role\":\"user\",\"content\":\"ping\"}]}" \
+    > /dev/null 2>&1
+  sleep 3
+  SESS_LIST="$(CURL "$BACKEND_URL/api/agents/default/sessions" 2>/dev/null)"
+  check "GET /api/agents/default/sessions 返回会话列表" \
+    "$( printf '%s' "$SESS_LIST" | grep -q 'sessionId' && echo 1 || echo 0 )"
+  SID="$(printf '%s' "$SESS_LIST" | grep -oP '"sessionId":"\K[^"]+' | head -n1)"
+  if [ -n "$SID" ]; then
+    SDEL="$(CURL -X DELETE "$BACKEND_URL/api/agents/default/sessions/$SID" 2>/dev/null)"
+    check "DELETE /api/agents/default/sessions/{sid} → deleted=true" \
+      "$( printf '%s' "$SDEL" | grep -q '"deleted":true' && echo 1 || echo 0 )" "resp=$SDEL"
+  else
+    check "DELETE session（无会话可删，跳过）" 1
+  fi
+  S404="$(CURL -o /dev/null -w '%{http_code}' "$BACKEND_URL/api/agents/nope/sessions" 2>/dev/null)"
+  check "GET /api/agents/nope/sessions → 404" \
+    "$( [ "$S404" = "404" ] && echo 1 || echo 0 )" "code=$S404"
+  SDEL404="$(CURL -o /dev/null -w '%{http_code}' -X DELETE "$BACKEND_URL/api/agents/default/sessions/regress-missing" 2>/dev/null)"
+  check "DELETE 不存在会话 → 404" \
+    "$( [ "$SDEL404" = "404" ] && echo 1 || echo 0 )" "code=$SDEL404"
+  # 路径穿越防御：应被拒（非 200）
+  STRAV="$(CURL -o /dev/null -w '%{http_code}' --path-as-is -X DELETE "$BACKEND_URL/api/agents/default/sessions/..%2F.." 2>/dev/null)"
+  check "DELETE 路径穿越被拒（非 200）" \
+    "$( [ "$STRAV" != "200" ] && echo 1 || echo 0 )" "code=$STRAV"
+else
+  skipped "会话管理（需 --full）"
 fi
 
 # =====================================================================
