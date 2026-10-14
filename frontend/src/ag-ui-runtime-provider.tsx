@@ -4,7 +4,7 @@ import {
   type RespondToToolApprovalOptions,
 } from "@assistant-ui/react"
 import { useAgUiRuntime } from "@assistant-ui/react-ag-ui"
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { aguiSseFetch } from "@/agui-sse"
 import {
   applySubagentEvent,
@@ -156,6 +156,11 @@ export function AgUiRuntimeProvider({
   // 取 cumulative 作为会话级累计，随调用次数更新。
   const [tokenUsage, setTokenUsage] = useState<TokenUsageSummary | null>(null)
   const [subagents, setSubagents] = useState<readonly SubagentRun[]>([])
+  // 子智能体的 `subagent.thinking` 可达数千条 delta，逐条 setState 会让主线程在
+  // 思考流式期间被数千次全量重渲染压垮（实测导致 chromium 主线程长时间阻塞、CDP 超时）。
+  // 这里用「可变缓冲 + rAF 合帧」：事件先累积到 ref，每动画帧最多 flush 一次到 state。
+  const pendingRef = useRef<readonly SubagentRun[]>([])
+  const rafRef = useRef<number | null>(null)
   useEffect(() => {
     const subscriber: AgentSubscriber = {
       onCustomEvent: ({ event }) => {
@@ -173,14 +178,27 @@ export function AgUiRuntimeProvider({
         // 子智能体内部事件：AgentScope 经 `subagent.*` CUSTOM 透出（非标准
         // SUBAGENT_* 事件，适配器不处理），这里单独累积供对话区展示。
         if (event.name.startsWith("subagent.")) {
-          setSubagents((previous) =>
-            applySubagentEvent(previous, event.value as SubagentEventValue),
+          pendingRef.current = applySubagentEvent(
+            pendingRef.current,
+            event.value as SubagentEventValue,
           )
+          if (rafRef.current === null) {
+            rafRef.current = requestAnimationFrame(() => {
+              rafRef.current = null
+              setSubagents(pendingRef.current)
+            })
+          }
         }
       },
     }
     const subscription = agent.subscribe(subscriber)
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
   }, [agent])
 
   const approvalRuntime = useMemo<ApprovalRuntime>(
