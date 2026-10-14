@@ -57,8 +57,20 @@ log "wait backend"; wait_http 'http://127.0.0.1:8080/api/agents' 120 || { log "F
 log "wait frontend";wait_http 'http://localhost:5173/' 60 || { log "FAIL frontend"; kill_port 8080; kill_port 5173; kill_port 8317; exit 1; }
 
 # ---- 解析助手 ----
+# agent-browser daemon 在长时间录制 + 重 UI 负载（如子智能体连续工具调用）下，
+# 偶发 snapshot 整段返回空；对 ref 解析做 3 次重试，避免瞬时空快照导致后续步骤全跳过。
 SNAP(){ agent-browser snapshot -i 2>>"$LOG"; }
-REF(){ local p="$1"; SNAP | grep -oP "$p" | head -1; }
+SNAP_R(){
+  local j s
+  for j in 1 2 3; do
+    s=$(SNAP)
+    [ -n "$s" ] && { echo "$s"; return 0; }
+    log "snapshot empty, retry $j"
+    sleep 2
+  done
+  return 1
+}
+REF(){ local p="$1"; SNAP_R | grep -oP "$p" | head -1; }
 get_msg(){  REF 'textbox "Message input" \[[^\]]*ref=\K[^\]]+'; }
 get_send(){ REF 'button "Send message" \[[^\]]*ref=\K[^\]]+'; }
 get_nav(){  REF "button \"$1\" \[[^\]]*ref=\K[^\]]+"; }
@@ -74,42 +86,44 @@ wait_idle(){
 # 发送消息并等待完成；期间自动点击 HITL「允许」审批（出现即点，不等超时，避免空等数分钟）
 # 完成判据（assistant-ui Composer 状态机）：发送中显示 "Cancel sending"，空闲显示 "Send message"，
 # 二者互斥，故不能只盯 Send；正确判据 = Cancel sending 消失（或 Send 恢复 enabled）。
+# 发送消息并等待完成；期间自动点击 HITL「允许」审批（出现即点，避免空等）。
+# 完成判据（实测 agent-browser 快照，assistant-ui Composer）：
+#   生成中 → button "Stop generating"（或旧版 "Cancel sending"）；
+#   空闲   → 该生成按钮消失，但 button "Send message" 因输入框已清空而 [disabled]，
+#           故【不能】以 Send 是否 enabled 判完成。
+# 正确做法：先「见到 Stop generating」(seen=1) 再「见不到」即判完成；若快照过快漏掉生成态，
+# 则在迭代>=30 且连续 15 拍无生成/无审批时兜底判完成。迭代上限 240 留足余量。
 send_msg(){
   local text="$1" MSG SEND
   MSG=$(get_msg); SEND=$(get_send)
   if [ -z "$MSG" ] || [ -z "$SEND" ]; then log "WARN no input/send ref, skip: ${text:0:16}"; return 1; fi
   AB fill "$MSG" "$text"; sleep 1
   AB click "$SEND"
-  local i allow send cancel stop s seen=0 idle=0
-  for i in $(seq 1 120); do
+  local i allow gen seen=0 calm=0
+  for i in $(seq 1 240); do
     s=$(SNAP)
     # 1) 审批优先：出现「允许」立即点击，让 agent 继续（否则 agent 卡在等待授权）
     allow=$(echo "$s" | grep -oP 'button "允许" \[[^\]]*ref=\K[^\]]+' | head -1)
     if [ -n "$allow" ]; then
       log "HITL allow auto-click"
-      AB click "$allow"; sleep 1; idle=0
+      AB click "$allow"; sleep 1; seen=1; calm=0
       continue
     fi
-    # 2) 生成中：Cancel sending 存在则继续等
-    cancel=$(echo "$s" | grep -oP 'button "Cancel sending"' | head -1)
-    if [ -n "$cancel" ]; then seen=1; idle=0; sleep 1; continue; fi
-    # 3) 完成：Send message 恢复 enabled
-    send=$(echo "$s" | grep -oP 'button "Send message" \[[^\]]*\]' | head -1)
-    if [ -n "$send" ] && ! echo "$send" | grep -q disabled; then return 0; fi
-    # 4) Stop generating（canCancel 未复位：审批等待或完成后的异常态）：连续稳定多轮视为完成
-    stop=$(echo "$s" | grep -oP 'button "Stop generating"' | head -1)
-    if [ -n "$stop" ]; then
-      idle=$((idle+1))
-      [ "$idle" -ge 10 ] && return 0
-      sleep 1; continue
-    fi
-    # 5) 无任何标志且之前见过生成 → 完成
-    [ "$seen" = "1" ] && return 0
+    # 2) 生成中：Stop generating / Cancel sending 存在
+    gen=$(echo "$s" | grep -oP 'button "(Stop generating|Cancel sending)"' | head -1)
+    if [ -n "$gen" ]; then seen=1; calm=0; sleep 1; continue; fi
+    # 3) 无生成按钮：已见生成态 → 完成；从未见（可能漏抓快回复）→ 连续平静兜底
+    if [ "$seen" = "1" ]; then return 0; fi
+    calm=$((calm+1))
+    if [ "$calm" -ge 15 ] && [ "$i" -ge 30 ]; then log "INFO calm-done: ${text:0:16}"; return 0; fi
     sleep 1
   done
   log "WARN timeout: ${text:0:16}"
   return 1
 }
+# 合成键盘事件（agent-browser 不一定支持 press 特殊键；App.tsx 用 window.addEventListener
+# 直接监听，故 dispatch 到 window 即可：?=帮助面板 Esc=关闭覆盖层）。
+press_key(){ AB eval "window.dispatchEvent(new KeyboardEvent('keydown',{key:'$1',bubbles:true}))"; sleep 1; }
 # 会话主按钮 ref：每个会话行 = 主按钮 + 紧随的「删除会话 X」按钮；取删除按钮前一行。
 # 注意：grep -P 的 \K 在 awk 管道后的中文行上失效，故用 ref=e[0-9]+ + sed 去前缀。
 sess_refs(){
@@ -164,6 +178,21 @@ send_msg "我让你记住的幸运数字是多少？"
 JB=$(get_nav "定时任务"); click_ref "$JB" "jobs"
 SK=$(get_nav "技能"); click_ref "$SK" "skills"
 AG=$(get_nav "Agent 管理"); click_ref "$AG" "agents"
+
+# 7) 子智能体演示（放在帮助面板之前：避免帮助面板遮住 composer 切换按钮）。
+#    先新建会话回到聊天视图（确保 composer chip 可见），再切到 Coder 派发 code-review 子智能体
+#    做只读单文件审查；send_msg 会自动处理 agent_spawn 的 HITL 审批。
+NC=$(get_nav "新建对话"); click_ref "$NC" "newchat-S3"
+CHIP=$(REF 'button "Workmate" \[[^\]]*ref=\K[^\]]+'); click_ref "$CHIP" "chip-open3"
+CODER=$(REF 'menuitemradio "Coder [^"]*" \[[^\]]*ref=\K[^\]]+'); click_ref "$CODER" "coder2"
+send_msg "请派 code-review 子智能体只读审查 src/main/kotlin/org/waylon/workmate/agent/AgentCatalog.kt 这一个文件的改动，并用一句话说明它是否符合最小依赖原则。不要修改任何文件。"
+log "subagent triggered, capture 60s of activity"
+sleep 60
+
+# 8) 键盘快捷键帮助面板（最后一步，收尾帧停在帮助面板；先 blur 避免输入框聚焦导致 ? 不触发）
+AB eval "if(document.activeElement)document.activeElement.blur()" 2>/dev/null
+press_key "?"
+sleep 3
 
 AB record stop
 AB close

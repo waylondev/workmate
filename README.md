@@ -2,9 +2,9 @@
 
 企业级 Agent 底座：以 [AgentScope](https://github.com/agentscope-ai/agentscope-java) 为内核、AG-UI 协议为唯一契约的智能体应用。后端 Spring WebFlux 承载 Agent 并输出 SSE 事件流，前端 React + assistant-ui 渲染流式对话、思考过程、工具调用与人机审批。
 
-<video src="docs/regression-demo.mp4" autoplay loop muted playsinline width="100%"></video>
+<video src="docs/showcase.mp4" autoplay loop muted playsinline width="100%"></video>
 
-> 上图（真实页面录屏）：发送消息 → HITL 审批横幅 → 点击「全部允许」→ 工具执行与流式回答（右栏 29 步工作进度）→ 定时任务 / 技能 / Agent 管理页。对应 CLI 一键回归：`bash scripts/regression/run.sh --full`（23 项含真实模型调用）。
+> 上图（真实页面录屏，非 AI 生成）：流式对话 + 思考卡片 + token 统计 → HITL 审批横幅 → 子智能体实时进度面板 → 多 Agent 切换 → 会话持久化（切回验证记忆）→ 定时任务 / 技能 / Agent 管理页 → `?` 快捷键帮助。录制脚本：`bash scripts/regression/record-demo.sh`。
 
 ## 核心功能（全部实测验证）
 
