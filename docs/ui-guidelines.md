@@ -35,13 +35,13 @@
 **铁律**：新增视觉值一律进令牌，禁止在组件里写 `shadow-[0_0_…]`、`bg-[#…]` 等 magic string；
 确需一次性取值用 `color-mix(in oklab, …)` 引用既有令牌。
 
-## 三、复用优先（不新增依赖）
+## 三、复用优先（轻量级依赖优先）
 
 - 图标：`lucide-react`（已在 `package.json`）。
 - 动画：Tailwind `animate-in` / `tw-shimmer` / `motion-reduce` 工具类，不引 framer-motion。
 - 组件：优先 `assistant-ui` 官方 primitive + 项目内 `ui/`（`Button` / `Skeleton` / `Textarea` /
   `Tooltip`）+ `TooltipIconButton` + `surfaces.tsx` 的 `pressable` / `ghostButton` 等工具类。
-- **任何新依赖必须先写 ADR（`docs/adr/`）并暂停确认**，见 `AGENTS.md` §一。
+- **轻量库（图表等）可直接引入；重依赖（framer-motion / R3F 等）必须先写 ADR（`docs/adr/`）并暂停确认**，见 `AGENTS.md` §一。
 
 ## 四、交互与无障碍底线
 
@@ -50,6 +50,9 @@
 3. 键盘可达：可交互元素用真实 `<button>`，焦点态用 `focus-visible:ring-*`。
 4. 深色 / 浅色双主题都可用（`.dark` 类切换，`ThemeToggle` 控制），改视觉时两套都要检查。
 5. 桌面端优先：单机内部工具，不做移动端响应式适配（见 `roadmap.md` N-8）。
+6. **键盘优先**：全局快捷键见 `frontend/src/keyboard.ts`（`Ctrl/⌘ K` 命令面板、`J/K` 会话导航、
+   `Enter` 打开、`A/R` 审批、`?` 帮助、`Esc` 关闭）。单键快捷键必须配合 `isEditableTarget` 守卫，
+   输入框聚焦时不触发；覆盖层打开时其余键交给覆盖层自身导航。
 
 ## 五、已落地的关键视觉资产
 

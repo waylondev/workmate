@@ -28,8 +28,9 @@
 
 - 视觉令牌**唯一来源**是 `frontend/src/index.css`（语义色 + 品牌色 + 阴影/发光令牌）。新增视觉值一律进令牌，
   禁止在组件里写 `shadow-[…]` / `bg-[#…]` 等 magic string。
-- **零新增依赖**：图标用 `lucide-react`，动画用 Tailwind `animate-in` / `tw-shimmer`，组件复用
-  `ui/` + `assistant-ui` primitive。确需新库 → 先写 ADR 并暂停确认。
+- **轻量级依赖优先**：图标用 `lucide-react`，动画用 Tailwind `animate-in` / `tw-shimmer`，组件复用
+  `ui/` + `assistant-ui` primitive。轻量库（图表等）可直接引入；重依赖（framer-motion / R3F 等）
+  → 先写 ADR 并暂停确认。
 - 所有动画带 `motion-reduce:animate-none`；图标按钮必须有 `aria-label`；交互元素用真实 `<button>`。
 - 视觉细节与已落地资产见 `docs/ui-guidelines.md`（前端视觉唯一权威）。
 
