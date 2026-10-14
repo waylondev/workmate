@@ -15,27 +15,20 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 /**
- * 置顶的全局授权横幅。
+ * 全局授权横幅。
  *
- * <p>当线程里出现待授权的工具调用时，在对话区顶部浮出一条高对比横幅，
- * 列出卡住的工具，并直接给出「允许 / 拒绝 / 全部允许」。用户无需点开
- * 工具卡才能发现需要授权。
+ * <p>当线程里出现待授权的工具调用时，在 composer 正上方（`ViewportFooter` 内，
+ * sticky 底部）浮出一条高对比横幅，列出卡住的工具，并直接给出
+ * 「允许 / 拒绝 / 全部允许」。用户无需点开工具卡才能发现需要授权。
+ *
+ * <p>放在 composer 上方而非对话区顶部，是因为审批是「继续对话」的前置动作，
+ * 落点应贴着视线末尾，长对话时也始终可见。
  *
  * <p>「全部允许」会一次性批准当前所有待授权项；「允许」只批准第一个。
- * 「本会话自动批准」开关（`autoApprove`）由调用方持有并传入：开启后本会话
+ * 「本会话自动批准」开关（`autoApprove`）由本组件自持：开启后本会话
  * 内后续出现的授权会自动放行，属内存态、不落盘。
  */
-export function ApprovalBanner({
-  className,
-  onAllowAllChange,
-  autoApprove,
-}: {
-  className?: string
-  /** 「本会话自动批准」开关状态回传（内存态，调用方持有）。 */
-  onAllowAllChange?: (enabled: boolean) => void
-  /** 是否已开启「本会话自动批准」，开启后自动批准新出现的授权。 */
-  autoApprove?: boolean
-}) {
+export function ApprovalBanner({ className }: { className?: string }) {
   const approvalRuntime = useApprovalRuntime()
   const messages = useAuiState((s) => s.thread.messages)
   const pending = useMemo(
@@ -46,8 +39,8 @@ export function ApprovalBanner({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 「本会话自动批准」开关状态（由调用方持有，本组件只读）。
-  const allowAll = autoApprove ?? false
+  // 「本会话自动批准」开关状态（本组件自持，内存态）。
+  const [autoApprove, setAutoApprove] = useState(false)
 
   const respond = useCallback(
     async (approvalId: string, approved: boolean) => {
@@ -79,7 +72,7 @@ export function ApprovalBanner({
   // 自动批准：开启「全部允许」后，新出现的待授权项立即放行。
   const lastAutoHandled = useRef<Set<string>>(new Set())
   useEffect(() => {
-    if (!allowAll) return
+    if (!autoApprove) return
     for (const item of pending) {
       if (lastAutoHandled.current.has(item.approvalId)) continue
       lastAutoHandled.current.add(item.approvalId)
@@ -87,7 +80,7 @@ export function ApprovalBanner({
         lastAutoHandled.current.delete(item.approvalId)
       })
     }
-  }, [allowAll, pending, respond])
+  }, [autoApprove, pending, respond])
 
   if (pending.length === 0) return null
 
@@ -99,7 +92,7 @@ export function ApprovalBanner({
         for (const item of pending) {
           await respond(item.approvalId, true)
         }
-        onAllowAllChange?.(true)
+        setAutoApprove(true)
       } else {
         // 允许/拒绝第一个（横幅按顺序展示，用户逐项处理）
         const target = pending[0]
@@ -121,7 +114,7 @@ export function ApprovalBanner({
       role="alert"
       aria-live="assertive"
       className={cn(
-        "border-amber-400/40 bg-amber-400/10 text-foreground animate-in fade-in slide-in-from-top-2 relative z-20 mx-3 mt-3 flex shrink-0 items-start gap-3 overflow-hidden rounded-xl border p-3.5 duration-200",
+        "border-amber-400/40 bg-amber-400/10 text-foreground animate-in fade-in slide-in-from-bottom-2 relative z-20 flex shrink-0 items-start gap-3 overflow-hidden rounded-xl border p-3.5 duration-200",
         className,
       )}
     >
@@ -190,9 +183,9 @@ export function ApprovalBanner({
           <label className="text-muted-foreground ml-1 inline-flex cursor-pointer items-center gap-1.5 text-xs">
             <input
               type="checkbox"
-              checked={allowAll}
+              checked={autoApprove}
               disabled={submitting}
-              onChange={(event) => onAllowAllChange?.(event.target.checked)}
+              onChange={(event) => setAutoApprove(event.target.checked)}
               className="size-3.5 accent-amber-400"
             />
             本会话内自动批准

@@ -4,7 +4,6 @@ import { ApiError, deleteSession as deleteSessionApi, listAgents } from "@/api"
 import { agentById, toAgentInfo, type AgentInfo } from "@/agents"
 import { AdminPanel } from "@/AdminPanel"
 import { ChatChromeProvider, type ChatChrome, type PanelSection, useChatChrome } from "@/chat-chrome"
-import { ApprovalBanner } from "@/components/approval-banner"
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandPalette } from "@/components/command-palette"
 import { ConversationSummaryPanel } from "@/components/conversation-summary-panel"
@@ -46,8 +45,6 @@ export default function App() {
   const [panelOpen, setPanelOpen] = useState(true)
   /** 会话在服务端卡在待授权时的出路提示；正常失败仍由消息内的错误区展示。 */
   const [failure, setFailure] = useState<AguiFailure | null>(null)
-  /** 本会话内「自动批准」开关：开启后新出现的工具授权自动放行（内存态，不落盘）。 */
-  const [allowAll, setAllowAll] = useState(false)
   /** Cmd/Ctrl+K 命令面板开关。 */
   const [paletteOpen, setPaletteOpen] = useState(false)
   /** `?` 快捷键帮助面板开关。 */
@@ -319,10 +316,6 @@ export default function App() {
                       onDismiss={() => setFailure(null)}
                     />
                   )}
-                  <ApprovalBanner
-                    autoApprove={allowAll}
-                    onAllowAllChange={setAllowAll}
-                  />
                   <div className="min-h-0 flex-1">
                     <Thread components={{ Welcome: () => <Welcome agentId={activeAgentId} /> }} />
                   </div>

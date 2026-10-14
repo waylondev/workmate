@@ -17,6 +17,7 @@ import {
   ReasoningText,
   ReasoningTrigger,
 } from "@/components/reasoning.aui";
+import { ApprovalBanner } from "@/components/approval-banner";
 import { SubagentActivity } from "@/components/subagent-activity";
 import { ToolFallback } from "@/components/tool-fallback.aui";
 import {
@@ -208,7 +209,9 @@ const ThreadRoot: FC<{ isEmpty: boolean; autoFocus: boolean }> = ({
       }}
     >
       <ThreadPrimitive.Viewport
-        turnAnchor="top"
+        // 跟随底部自动滚动（官方缺省即 bottom + autoScroll=true）。此前误设
+        // "top"（照抄官方 @example），会关掉自动滚底、长回复停在中间。
+        turnAnchor="bottom"
         data-slot="aui_thread-viewport"
         className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth"
       >
@@ -247,6 +250,7 @@ const ThreadRoot: FC<{ isEmpty: boolean; autoFocus: boolean }> = ({
           >
             <ThreadScrollToBottom />
             <ThreadFollowupSuggestions />
+            <ApprovalBanner />
             <Composer autoFocus={autoFocus} />
             <AuiIf condition={(s) => isNewChatView(s) && s.composer.isEmpty}>
               <ThreadSuggestions />
