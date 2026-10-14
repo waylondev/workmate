@@ -17,6 +17,7 @@ import {
   ReasoningText,
   ReasoningTrigger,
 } from "@/components/reasoning.aui";
+import { SubagentActivity } from "@/components/subagent-activity";
 import { ToolFallback } from "@/components/tool-fallback.aui";
 import {
   ToolGroupContent,
@@ -234,6 +235,8 @@ const ThreadRoot: FC<{ isEmpty: boolean; autoFocus: boolean }> = ({
               {() => <ThreadMessage />}
             </ThreadPrimitive.Messages>
           </div>
+
+          <SubagentActivity />
 
           <ThreadPrimitive.ViewportFooter
             className={cn(

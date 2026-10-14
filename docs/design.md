@@ -191,10 +191,12 @@ hidden: false                              # 可选
 - 子智能体声明是**配置性质**，已加入 `.gitignore` 豁免（与 `AGENTS.md` / `knowledge/` 同级），随版本控制。
 - 运行中的后端不会热加载新声明的子智能体（agent 是启动期构建的），新增/修改后需重启才会生效。
 
-**派发机制（2026-10-12 真实模型端到端验证）**：子智能体并非以独立工具名（如 `code_review`）注入主 agent 的静态工具集，
+**派发机制（2026-10-12 真实模型端到端验证，2026-10-14 补充事件透出）**：子智能体并非以独立工具名（如 `code_review`）注入主 agent 的静态工具集，
 而是经 `DynamicSubagentsMiddleware` 挂到主 agent，由**统一的 `agent_spawn` 工具**派发——主 agent 调用
 `agent_spawn` 并传 `agent_id`（子智能体名）+ `task`（委派任务），`SubAgentTool.callAsync` 内部执行子智能体的
-对话并把最终回复回灌给主 agent。因此：
+对话，最终回复作为 `agent_spawn` 的 tool result 回灌给主 agent。此外 `SubAgentTool.forwardEvents` 默认 `true`，
+会把子智能体内部过程（lifecycle/thinking/text/tool_call/tool_result）经 `subagent.*` Custom 事件**流式透出**
+（非标准 `SUBAGENT_*` 事件），前端订阅并实时渲染（见 §3.6 与 `docs/agui-gaps.md`）。因此：
 
 - 启动日志里看不到 `code-review` 这类工具，只看到 `subagents=true` 与标准 `agent_spawn` 工具，是**正常现象**（subagent 是动态 middleware，不走静态 Toolkit 注册日志）。
 - `agent_spawn` 属高风险写操作，会被权限引擎拦截为 `permission_confirm`（`interruptKind`）回到前端 HITL 审批——**`accept-edits` / `explore` 权限模式不会自动放行 subagent 派发**，需要用户点「允许」才真正执行。
@@ -355,6 +357,12 @@ Quartz，创建/取消时同步写回。落盘失败只记日志、不阻断已�
 
 **会话目录在前端**（§3.1）：`sessions.ts` 用 localStorage 维护 `threadId → { agentId, title, updatedAt }`，首条用户消息自动生成标题。
 
+**子智能体过程可视化（P0-1）**：`agent_spawn` 派发子智能体时，其内部过程经 `subagent.*` Custom 事件（非标准
+`SUBAGENT_*`，见 `docs/agui-gaps.md`）流式透出。这些事件**不进 `thread.messages`**，由 `ag-ui-runtime-provider.tsx`
+单独订阅、累积到 `SubagentContext`（纯函数 `subagent.ts` 的 `applySubagentEvent`），在消息流末尾经
+`subagent-activity.tsx` 渲染为折叠面板（思考 / 正文 / 工具调用）。与右栏不同，这是**「事件投影」而非「消息派生」**——
+它展示的是消息之外的事件流；状态仍挂 `AgUiRuntimeProvider` 内，切换会话随 `key` 重挂载自动清空，不违反「右栏不维护独立状态」约束。
+
 ## 4. 实施状态
 
 | 阶段 | 内容 | 状态 |
@@ -366,6 +374,7 @@ Quartz，创建/取消时同步写回。落盘失败只记日志、不阻断已�
 | P4 | 定时任务（cron 创建 / 列表 / 取消，真实触发已验证） | ✅ 已实测 |
 | P4.1 | 定时任务定义持久化（落盘 + 重启恢复） | ✅ 已实测 |
 | P5 | 三栏前端外壳（左栏 / 中栏 / 右栏工作进度） | ✅ 已构建 + SSR 校验 |
+| P5.1 | 子智能体过程可视化（消费 `subagent.*` Custom 事件） | ✅ 已构建 + 编译 + check（见 §3.6 / `agui-gaps.md`）|
 | P1-1 | 服务端会话列表 / 删除 | ✅ 已实测（见 §3.1）|
 
 ## 5. 官方 API 核销
@@ -380,3 +389,4 @@ Quartz，创建/取消时同步写回。落盘失败只记日志、不阻断已�
 | 2 | **复用带未决审批的 threadId 需先 resume** | 裸客户端未 resume 就复用会收到 `RUN_ERROR: Thread has unresolved interrupts` | 这是 AG-UI 的 interrupt 契约，不是缺陷；前端 `tool-fallback.aui.tsx` 用 `respondToApproval` / `addResult` 解决 |
 | 3 | **技能删除依赖 `setWriteable` 临时开闸** | 并发删除同一技能存在竞态窗口 | 单机管理面可接受；若要严格化需仓库层支持原子归档 |
 | 4 | **agent 定义不可运行时增删改** | 只支持注册态切换 | 定义来自 yaml，属未做项 |
+| 5 | **子智能体中间过程不跨刷新持久化** | 刷新 / 切回会话后子智能体的思考 / 工具调用过程不显示，仅剩 `agent_spawn` 的最终 result | `subagent.*` 是事件流、不落盘，历史会话不重放；属事件流性质，非缺陷 |

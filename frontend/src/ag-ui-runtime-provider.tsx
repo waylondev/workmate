@@ -6,6 +6,11 @@ import {
 import { useAgUiRuntime } from "@assistant-ui/react-ag-ui"
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { aguiSseFetch } from "@/agui-sse"
+import {
+  applySubagentEvent,
+  type SubagentEventValue,
+  type SubagentRun,
+} from "@/subagent"
 
 /**
  * 运行时能力上下文：把 AG-UI 适配器注册的工具审批方法暴露给
@@ -77,6 +82,13 @@ export function useTokenUsage(): TokenUsageSummary | null {
   return useContext(TokenUsageContext)
 }
 
+const SubagentContext = createContext<readonly SubagentRun[]>([])
+
+/** 读取当前会话的子智能体运行状态（实时累积自 `subagent.*` CUSTOM 事件）。 */
+export function useSubagents(): readonly SubagentRun[] {
+  return useContext(SubagentContext)
+}
+
 /**
  * 从 `token_usage` CUSTOM 事件的 `cumulative` 字段累计 token 用量。
  *
@@ -143,18 +155,28 @@ export function AgUiRuntimeProvider({
   // `AguiEvent.Custom(name="token_usage")`，payload 含 delta + cumulative。
   // 取 cumulative 作为会话级累计，随调用次数更新。
   const [tokenUsage, setTokenUsage] = useState<TokenUsageSummary | null>(null)
+  const [subagents, setSubagents] = useState<readonly SubagentRun[]>([])
   useEffect(() => {
     const subscriber: AgentSubscriber = {
       onCustomEvent: ({ event }) => {
-        if (event.name !== "token_usage") return
-        const value = event.value as
-          | { cumulative?: TokenUsageSnapshot; delta?: TokenUsageSnapshot }
-          | undefined
-        const cumulative = value?.cumulative ?? value?.delta
-        if (!cumulative) return
-        setTokenUsage((previous) =>
-          toSummary(cumulative, (previous?.calls ?? 0) + 1),
-        )
+        if (event.name === "token_usage") {
+          const value = event.value as
+            | { cumulative?: TokenUsageSnapshot; delta?: TokenUsageSnapshot }
+            | undefined
+          const cumulative = value?.cumulative ?? value?.delta
+          if (!cumulative) return
+          setTokenUsage((previous) =>
+            toSummary(cumulative, (previous?.calls ?? 0) + 1),
+          )
+          return
+        }
+        // 子智能体内部事件：AgentScope 经 `subagent.*` CUSTOM 透出（非标准
+        // SUBAGENT_* 事件，适配器不处理），这里单独累积供对话区展示。
+        if (event.name.startsWith("subagent.")) {
+          setSubagents((previous) =>
+            applySubagentEvent(previous, event.value as SubagentEventValue),
+          )
+        }
       },
     }
     const subscription = agent.subscribe(subscriber)
@@ -185,7 +207,9 @@ export function AgUiRuntimeProvider({
     <AssistantRuntimeProvider runtime={runtime}>
       <ApprovalRuntimeContext.Provider value={approvalRuntime}>
         <TokenUsageContext.Provider value={tokenUsage}>
-          {children}
+          <SubagentContext.Provider value={subagents}>
+            {children}
+          </SubagentContext.Provider>
         </TokenUsageContext.Provider>
       </ApprovalRuntimeContext.Provider>
     </AssistantRuntimeProvider>
