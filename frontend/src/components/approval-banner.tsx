@@ -166,7 +166,8 @@ export function ApprovalBanner({ className }: { className?: string }) {
             type="button"
             disabled={submitting}
             onClick={() => run("allow-all")}
-            className="bg-amber-400 hover:bg-amber-300 text-black inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors disabled:opacity-60"
+            title="批准当前全部待授权项，并开启本会话自动批准"
+            className="border-border/60 text-muted-foreground hover:text-foreground hover:bg-accent inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors disabled:opacity-60"
           >
             <ZapIcon className="size-3.5" aria-hidden />
             全部允许
