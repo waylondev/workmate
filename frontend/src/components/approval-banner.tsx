@@ -2,6 +2,7 @@
 
 import { derivePendingApprovals, type PendingApproval } from "@/approvals"
 import { useApprovalRuntime } from "@/ag-ui-runtime-provider"
+import { isEditableTarget } from "@/keyboard"
 import { cn } from "@/lib/utils"
 import { useAuiState } from "@assistant-ui/react"
 import {
@@ -54,6 +55,26 @@ export function ApprovalBanner({
     },
     [approvalRuntime],
   )
+
+  // A/R 键盘快捷审批：A=允许第一个待授权项、R=拒绝第一个（仅当有待授权且焦点
+  // 不在输入框、无修饰键时触发）。
+  useEffect(() => {
+    if (pending.length === 0) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) return
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
+      const key = event.key.toLowerCase()
+      if (key !== "a" && key !== "r") return
+      event.preventDefault()
+      const target = pending[0]
+      if (!target || submitting) return
+      void respond(target.approvalId, key === "a").catch((cause) => {
+        setError(cause instanceof Error ? cause.message : String(cause))
+      })
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [pending, respond, submitting])
 
   // 自动批准：开启「全部允许」后，新出现的待授权项立即放行。
   const lastAutoHandled = useRef<Set<string>>(new Set())

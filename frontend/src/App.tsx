@@ -6,10 +6,13 @@ import { AdminPanel } from "@/AdminPanel"
 import { ChatChromeProvider, type ChatChrome, type PanelSection, useChatChrome } from "@/chat-chrome"
 import { ApprovalBanner } from "@/components/approval-banner"
 import { AppSidebar } from "@/components/app-sidebar"
+import { CommandPalette } from "@/components/command-palette"
 import { ConversationSummaryPanel } from "@/components/conversation-summary-panel"
+import { KeyboardHelp } from "@/components/keyboard-help"
 import { Thread } from "@/components/thread.aui"
 import { TooltipIconButton } from "@/components/tooltip-icon-button"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { isEditableTarget } from "@/keyboard"
 import { NAV_TITLES, type NavKey } from "@/nav"
 import {
   loadSessions,
@@ -45,6 +48,12 @@ export default function App() {
   const [failure, setFailure] = useState<AguiFailure | null>(null)
   /** 本会话内「自动批准」开关：开启后新出现的工具授权自动放行（内存态，不落盘）。 */
   const [allowAll, setAllowAll] = useState(false)
+  /** Cmd/Ctrl+K 命令面板开关。 */
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  /** `?` 快捷键帮助面板开关。 */
+  const [helpOpen, setHelpOpen] = useState(false)
+  /** 键盘导航（J/K）当前高亮的会话；Enter 打开。 */
+  const [focusedThreadId, setFocusedThreadId] = useState<string | null>(threadId)
 
   // 启动拉取 agent 目录；首项作为默认 agent。
   useEffect(() => {
@@ -95,13 +104,16 @@ export default function App() {
     setNav("chat")
   }
 
-  const switchSession = (id: string) => {
-    const session = sessions.find((item) => item.threadId === id)
-    if (!session) return
-    setThreadId(id)
-    setAgentId(session.agentId)
-    setNav("chat")
-  }
+  const switchSession = useCallback(
+    (id: string) => {
+      const session = sessions.find((item) => item.threadId === id)
+      if (!session) return
+      setThreadId(id)
+      setAgentId(session.agentId)
+      setNav("chat")
+    },
+    [sessions],
+  )
 
   /**
    * 删除会话：先删服务端转录文件，再移除本地目录。
@@ -186,6 +198,82 @@ export default function App() {
     [agents, activeAgentId, handleAgentChange, revealPanel],
   )
 
+  // 切换会话 / 新建会话后，键盘高亮自动跟随当前会话。
+  useEffect(() => {
+    setFocusedThreadId(threadId)
+  }, [threadId])
+
+  // 命令面板「切换 Agent」：换 agent 并回到对话视图。
+  const switchAgentToChat = useCallback(
+    (id: string) => {
+      handleAgentChange(id)
+      setNav("chat")
+    },
+    [handleAgentChange],
+  )
+
+  // 全局键盘快捷键：Cmd/Ctrl+K（命令面板）、?（帮助）、J/K（会话导航）、
+  // Enter（打开高亮会话）、Esc（关闭覆盖层）。单键快捷键在输入框内与覆盖层
+  // 打开时一律不触发，交给输入框 / 覆盖层自身处理。
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      // Cmd/Ctrl+K：命令面板（全局可用，含输入框内）
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault()
+        setPaletteOpen((open) => !open)
+        setHelpOpen(false)
+        return
+      }
+      if (isEditableTarget(event.target)) return
+      // Esc：关闭任一打开的覆盖层
+      if (event.key === "Escape") {
+        if (paletteOpen || helpOpen) {
+          setPaletteOpen(false)
+          setHelpOpen(false)
+        }
+        return
+      }
+      // ?：帮助面板开关
+      if (event.key === "?") {
+        event.preventDefault()
+        setHelpOpen((open) => !open)
+        setPaletteOpen(false)
+        return
+      }
+      // 覆盖层打开时，其余键交给面板自身的键盘导航
+      if (paletteOpen || helpOpen) return
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
+      if (event.key === "j" || event.key === "k") {
+        if (sessions.length === 0) return
+        event.preventDefault()
+        if (!sidebarOpen) setSidebarOpen(true)
+        const index = sessions.findIndex(
+          (session) => session.threadId === focusedThreadId,
+        )
+        const next = event.key === "j" ? index + 1 : index - 1
+        if (next < 0 || next >= sessions.length) return
+        setFocusedThreadId(sessions[next].threadId)
+        return
+      }
+      if (event.key === "Enter") {
+        if (focusedThreadId && focusedThreadId !== threadId) {
+          event.preventDefault()
+          switchSession(focusedThreadId)
+        }
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [
+    paletteOpen,
+    helpOpen,
+    sessions,
+    focusedThreadId,
+    threadId,
+    sidebarOpen,
+    switchSession,
+  ])
+
   return (
     <TooltipProvider>
       <div className="bg-background flex h-dvh">
@@ -195,6 +283,7 @@ export default function App() {
             onNav={setNav}
             sessions={sessions}
             currentThreadId={threadId}
+            focusedThreadId={focusedThreadId}
             onNewChat={createSession}
             onSwitchSession={switchSession}
             onDeleteSession={deleteSession}
@@ -261,6 +350,22 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {paletteOpen && (
+        <CommandPalette
+          onClose={() => setPaletteOpen(false)}
+          agents={agents}
+          agentId={activeAgentId}
+          onNewChat={createSession}
+          onSwitchAgent={switchAgentToChat}
+          onNav={(key) => setNav(key)}
+          sidebarOpen={sidebarOpen}
+          panelOpen={panelOpen}
+          onToggleSidebar={() => setSidebarOpen((open) => !open)}
+          onTogglePanel={() => setPanelOpen((open) => !open)}
+        />
+      )}
+      {helpOpen && <KeyboardHelp onClose={() => setHelpOpen(false)} />}
     </TooltipProvider>
   )
 }

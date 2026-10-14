@@ -26,6 +26,7 @@ export function AppSidebar({
   onNav,
   sessions,
   currentThreadId,
+  focusedThreadId,
   onNewChat,
   onSwitchSession,
   onDeleteSession,
@@ -35,6 +36,7 @@ export function AppSidebar({
   onNav: (key: NavKey) => void
   sessions: ChatSession[]
   currentThreadId: string
+  focusedThreadId: string | null
   onNewChat: () => void
   onSwitchSession: (threadId: string) => void
   onDeleteSession: (threadId: string) => void
@@ -91,6 +93,7 @@ export function AppSidebar({
                 <SessionRow
                   session={session}
                   active={nav === "chat" && session.threadId === currentThreadId}
+                  focused={session.threadId === focusedThreadId}
                   onSwitch={onSwitchSession}
                   onDelete={onDeleteSession}
                 />
@@ -160,11 +163,13 @@ function SidebarRow({
 function SessionRow({
   session,
   active,
+  focused,
   onSwitch,
   onDelete,
 }: {
   session: ChatSession
   active: boolean
+  focused: boolean
   onSwitch: (threadId: string) => void
   onDelete: (threadId: string) => void
 }) {
@@ -174,7 +179,9 @@ function SessionRow({
         "group flex items-center gap-1 rounded-lg transition-colors",
         active
           ? "bg-primary/10 text-foreground shadow-inset-primary"
-          : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
+          : focused
+            ? "text-foreground shadow-inset-primary"
+            : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
       )}
     >
       <button
